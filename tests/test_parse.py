@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 from parse import parse_matchups, parse_selected_params
@@ -24,3 +25,8 @@ def test_empty_page_returns_empty_dict():
 
 def test_selected_params_match_page():
     assert parse_selected_params(FIXTURE) == ('202605', '41', 'aki')
+
+
+def test_selected_params_raises_on_missing_options():
+    with pytest.raises(StopIteration):
+        parse_selected_params('<html><body>no options</body></html>')
