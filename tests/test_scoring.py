@@ -68,3 +68,21 @@ def test_parse_weights_custom_spec():
     from scoring import parse_weights
     assert parse_weights('202601=0,202603=0.5,202605=1') == {
         '202601': 0.0, '202603': 0.5, '202605': 1.0}
+
+
+def test_coverage_missing_sub_data_counts_as_neutral():
+    main = {'A': 4.5, 'B': 4.5}          # equal weaknesses, w = 0.25 each
+    sub = {'A': 6.0}                     # no data vs B -> neutral 5.0
+    assert coverage(main, sub) == pytest.approx(0.5)
+
+
+def test_correlation_no_shared_opponents_returns_zero():
+    assert correlation({'x': 4.0}, {'y': 6.0}) == 0.0
+
+
+def test_correlation_single_shared_opponent_returns_zero():
+    assert correlation({'x': 5.0, 'y': 4.0}, {'x': 5.0, 'z': 6.0}) == 0.0
+
+
+def test_wavg_disjoint_weight_keys_returns_none():
+    assert wavg({'a': 4.0}, {'b': 1.0}) is None

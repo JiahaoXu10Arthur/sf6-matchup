@@ -6,7 +6,7 @@ def expand_months(args):
     out = []
     for a in args:
         if '-' in a:
-            lo, hi = a.split('-')
+            lo, hi = a.split('-', 1)
             y, mo = int(lo[:4]), int(lo[4:])
             while f'{y}{mo:02d}' <= hi:
                 out.append(f'{y}{mo:02d}')
@@ -46,12 +46,13 @@ def wavg(scores, weights):
 
 def coverage(main_row, sub_row):
     """Sub coverage of main's weaknesses.
-    COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), w(O) = max(0, 5 - main_vs_O)^2."""
+    COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), w(O) = max(0, 5 - main_vs_O)^2.
+    Opponents missing from sub_row count as neutral (5.0): no data, no edge."""
     num = den = 0.0
     for opp, ms in main_row.items():
         w = max(0.0, 5.0 - ms) ** 2
-        if w and opp in sub_row:
-            num += w * (sub_row[opp] - 5.0)
+        if w:
+            num += w * (sub_row.get(opp, 5.0) - 5.0)
             den += w
     return num / den if den else 0.0
 
@@ -59,6 +60,8 @@ def coverage(main_row, sub_row):
 def correlation(a, b):
     """Pearson correlation over shared opponents. Negative = complementary."""
     keys = sorted(set(a) & set(b))
+    if not keys:
+        return 0.0
     xs, ys = [a[k] for k in keys], [b[k] for k in keys]
     mx, my = fmean(xs), fmean(ys)
     sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
