@@ -171,6 +171,9 @@ python3 -m http.server 8741        # 在仓库根目录运行
 
 ## 离线单文件构建
 
+预构建文件已附在[最新 Release](https://github.com/JiahaoXu10Arthur/sf6-matchup/releases/latest)中，
+下载后直接打开即可。如需基于当前数据重新构建：
+
 ```bash
 python3 scripts/build_standalone.py
 ```

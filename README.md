@@ -196,6 +196,10 @@ math in `web/scoring.js` is a direct port of `scripts/scoring.py`;
 
 ## Offline standalone build
 
+Pre-built files are attached to the
+[latest release](https://github.com/JiahaoXu10Arthur/sf6-matchup/releases/latest) —
+download and open directly. To rebuild from current data:
+
 ```bash
 python3 scripts/build_standalone.py
 ```
