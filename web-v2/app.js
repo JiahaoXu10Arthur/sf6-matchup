@@ -134,16 +134,21 @@ function sliderRow(name, value, max, step, onInput) {
 // hidden and re-addable via the picker — keeps 16 months from flooding the card.
 function buildMonthSliders() {
   const box = $('#month-sliders');
+  // this fn rebuilds the whole list on each stepper click, so remember which
+  // button held focus and restore it afterward (keyboard nav must survive).
+  const focusMonth = document.activeElement?.closest?.('.month-w')?.dataset.month;
+  const focusDir = document.activeElement?.dataset.d;
   box.textContent = '';
   const fmtw = w => String(Math.round(w * 100) / 100);
+  const label = m => `${m.slice(0, 4)}.${m.slice(4)}`;
   for (const m of months.filter(x => (state.monthW[x] ?? 0) > 0)) {
     const row = document.createElement('div');
     row.className = 'month-w';
     row.dataset.month = m;
-    row.innerHTML = `<button class="month-step" data-d="-1" aria-label="decrease">−</button>
-      <span class="month-name">${m.slice(0, 4)}.${m.slice(4)}</span>
+    row.innerHTML = `<button class="month-step" data-d="-1" aria-label="decrease ${label(m)} weight">−</button>
+      <span class="month-name">${label(m)}</span>
       <span class="month-val">${fmtw(state.monthW[m])}</span>
-      <button class="month-step" data-d="1" aria-label="increase">+</button>`;
+      <button class="month-step" data-d="1" aria-label="increase ${label(m)} weight">+</button>`;
     row.querySelectorAll('.month-step').forEach(btn =>
       btn.addEventListener('click', () => {
         const w = Math.max(0, Math.min(1, (state.monthW[m] ?? 0) + Number(btn.dataset.d) * MONTH_STEP));
@@ -158,8 +163,9 @@ function buildMonthSliders() {
   if (inactive.length) {
     const sel = document.createElement('select');
     sel.className = 'month-add';
+    sel.setAttribute('aria-label', t('addMonth'));
     sel.innerHTML = `<option value="">${t('addMonth')}</option>` +
-      inactive.map(m => `<option value="${m}">${m.slice(0, 4)}.${m.slice(4)}</option>`).join('');
+      inactive.map(m => `<option value="${m}">${label(m)}</option>`).join('');
     sel.addEventListener('change', () => {
       if (!sel.value) return;
       state.monthW[sel.value] = 1;
@@ -168,6 +174,11 @@ function buildMonthSliders() {
       render();
     });
     box.appendChild(sel);
+  }
+  // restore focus to the same control (or the add picker if the month dropped out)
+  if (focusMonth) {
+    const same = box.querySelector(`.month-w[data-month="${focusMonth}"] .month-step[data-d="${focusDir}"]`);
+    (same || box.querySelector('.month-add'))?.focus();
   }
 }
 
@@ -340,8 +351,10 @@ function renderSubs() {
   const ranked = results.filter(r => metric(r) !== null).sort((a, b) => metric(b) - metric(a));
 
   const top = ranked[0];
-  const compl = results.slice().sort((a, b) => a.corr - b.corr)[0];
-  $('#hero-summary').innerHTML = top ?
+  // complement is drawn from the ranked (visible) set so it can't name a
+  // character that was filtered out of the leaderboard.
+  const compl = ranked.slice().sort((a, b) => a.corr - b.corr)[0];
+  $('#hero-summary').innerHTML = (top && compl) ?
     `<span class="sum adv">${t('kTopSub')}: ${cn(top.sub)} ${sfmt(metric(top))}</span>` +
     `<span class="sum even">${t('kComplement')}: ${cn(compl.sub)} r${sfmt(compl.corr, 2)}</span>` : '';
 
