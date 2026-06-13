@@ -1,5 +1,6 @@
 import csv
 from pathlib import Path
+from statistics import median
 
 from parse import parse_matchups, parse_selected_params
 from roster import NAME_BY_SLUG
@@ -39,7 +40,8 @@ def main():
     print(f'{len(rows)} rows -> {out}')
     for name, why in skipped:
         print(f'  skipped {name}: {why}')
-    print(f'anti-symmetry: {len(devs)} pairs, max deviation {max(devs):.4f}')
+    print(f'anti-symmetry: {len(devs)} pairs, median {median(devs):.4f} '
+          f'(pass < 0.05), max {max(devs):.4f}')
 
 
 if __name__ == '__main__':
