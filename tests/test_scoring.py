@@ -91,6 +91,15 @@ def test_coverage_weight_targets_non_weakness():
     assert coverage(main, sub, {'B': 3.0}) == pytest.approx(0.5 / 0.75)
 
 
+def test_coverage_target_inject_is_constant_not_worst_matchup():
+    # worst matchup severity is 1.0 (a 4.0), but the injected weight for a
+    # targeted non-weakness must stay 0.25, independent of the worst matchup.
+    main = {'A': 4.0, 'B': 5.5}          # A sev 1.0, B favourable (sev 0)
+    sub = {'A': 5.0, 'B': 6.0}           # neutral vs A, +1 vs B
+    # target B at u=2: w(A)=1.0 (edge 0), w(B)=(2-1)*0.25=0.25 (edge +1)
+    assert coverage(main, sub, {'B': 2.0}) == pytest.approx(0.25 / 1.25)
+
+
 def test_correlation_no_shared_opponents_returns_zero():
     assert correlation({'x': 4.0}, {'y': 6.0}) == 0.0
 

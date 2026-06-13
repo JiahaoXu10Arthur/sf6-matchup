@@ -5,6 +5,7 @@
 const PATCH_MONTH = '202603'; // major all-character balance patch, 2026-03-17
 const DEFAULT_TIER_WEIGHTS = { 40: 1, 41: 2, 42: 3 };
 const RANK_NAMES = { 40: 'HighM', 41: 'GrandM', 42: 'UltM' };
+const TARGET_INJECT = 0.25;   // weight a targeted (u>1) non-weakness as a 4.5 matchup; keep in sync with scoring.py
 
 function monthWeights(months, profile, patchMonth) {
   if (profile === 'all') return Object.fromEntries(months.map(m => [m, 1.0]));
@@ -25,21 +26,17 @@ function wavg(scores, weights) {
 }
 
 function coverage(mainRow, subRow, oppWeights) {
-  // w(O) = u(O)·sev(O) + max(0, u(O)−1)·inject,  sev = max(0, 5−main)²,
-  // inject = max(maxSev, 0.02). u defaults to 1 (→ plain weakness-weighted score),
-  // u=0 drops O, u>1 targets it. Missing subRow entries count as neutral (5.0).
+  // w(O) = u(O)·sev(O) + max(0, u(O)−1)·TARGET_INJECT,  sev = max(0, 5−main)².
+  // u defaults to 1 (→ plain weakness-weighted score), u=0 drops O, u>1 targets
+  // it. Missing subRow entries count as neutral (5.0).
   const sev = {};
-  let maxSev = 0;
   for (const [o, ms] of Object.entries(mainRow)) {
-    const v = Math.max(0, 5.0 - ms) ** 2;
-    sev[o] = v;
-    if (v > maxSev) maxSev = v;
+    sev[o] = Math.max(0, 5.0 - ms) ** 2;
   }
-  const inject = Math.max(maxSev, 0.02);
   let num = 0, den = 0;
   for (const [opp, s] of Object.entries(sev)) {
     const u = oppWeights ? (oppWeights[opp] ?? 1) : 1;
-    const w = u * s + Math.max(0, u - 1) * inject;
+    const w = u * s + Math.max(0, u - 1) * TARGET_INJECT;
     if (w) {
       num += w * ((subRow[opp] ?? 5.0) - 5.0);
       den += w;

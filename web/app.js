@@ -337,11 +337,11 @@ function rowSkeleton(cols) {
   return el;
 }
 
-function axisHtml(leftLabel, barLabels, cols, headers) {
+function axisHtml(leftLabel, barLabels, cols, headers, titles = []) {
   return `<span>${leftLabel}</span>
     <span class="axis-bar"><span>${barLabels[0]}</span><span>${barLabels[1]}</span><span>${barLabels[2]}</span></span>
     <div class="nums">${cols.map(([w, ty], i) =>
-      `<span class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}">${headers[i]}</span>`).join('')}</div>`;
+      `<span class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}"${titles[i] ? ` title="${titles[i]}"` : ''}>${headers[i]}</span>`).join('')}</div>`;
 }
 
 function setBar(el, frac) {
@@ -431,7 +431,8 @@ function renderSubs() {
   $('#axis').innerHTML = axisHtml(
     t('axisSub'),
     [t('axisShares'), t('axisZero'), t('axisCovers')],
-    COLS.subs, [t('hCover'), t('hW3'), t('hCorr'), t('hShared')]);
+    COLS.subs, [t('hCover'), t('hW3'), t('hCorr'), t('hShared')],
+    [, , t('corrHint')]);
 
   syncRows(rows.map(r => r.sub),
     () => rowSkeleton(COLS.subs),

@@ -39,9 +39,9 @@ Two interchangeable front-end designs share the same data and logic:
 
 ## Features
 
-- **Any character, any time range** — `--char`, `--months 202601-202605` (cross-year supported).
+- **Any character, any time range** — `--char`, `--months 202502-202605` (cross-year supported).
 - **All three rank tiers** — High / Grand / Ultimate Master, viewable individually or
-  combined with a 3 : 2 : 1 population weighting.
+  combined with a 1 : 2 : 3 skill-depth weighting (Ultimate weighted most; see [methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)).
 - **Patch-aware month weighting** — `current` (post-patch) and `all` (equal) presets, or
   fully custom per-month weights; the same `{month: weight}` dictionary drives the
   interactive sliders.
@@ -113,16 +113,20 @@ Month-weight profiles (`w_m`):
 | custom (`--weights`) | user-supplied per-month values |
 
 **4. Tier combination → COMB.** The per-rank means are combined across whichever
-tiers have data, using population weights `W = {High: 3, Grand: 2, Ult: 1}`:
+tiers have data, using skill-depth weights `W = {High: 1, Grand: 2, Ult: 3}`:
 
 ```text
 COMB(O) = Σ_r  W_r · m̄(O, r)  /  Σ_r  W_r
 ```
 
-High Master carries the most weight (largest, least-noisy population), Ultimate
-the least. A single-rank view (`--profile` on a chosen rank) simply uses
-`m̄(O, r)` directly. A per-opponent **Δpatch** drift = (Grand Master post-patch
-mean − pre-patch mean) is reported separately.
+Ultimate Master carries the most weight: higher rank = deeper game understanding,
+so its matchup reads sit closest to the matchup's true value. This is a
+deliberate bias-over-variance choice — Ultimate is the *noisiest* tier (smallest
+population) but the most informed — explained in
+[the methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights). A
+single-rank view (`--profile` on a chosen rank) simply uses `m̄(O, r)` directly.
+A per-opponent **Δpatch** drift = (Grand Master post-patch mean − pre-patch
+mean) is reported separately.
 
 ### Complementary sub-character recommendation
 
@@ -130,17 +134,23 @@ The main character's COMB vector defines its weaknesses. Each candidate sub is
 scored by **coverage**:
 
 ```text
-COVER = Σ w(O) · (sub_vs_O − 5) / Σ w(O),   where  w(O) = max(0, 5 − main_vs_O)²
+COVER = Σ w(O) · (sub_vs_O − 5) / Σ w(O)
+where  w(O) = u(O) · sev(O) + max(0, u(O) − 1) · 0.25,   sev(O) = max(0, 5 − main_vs_O)²
 ```
 
-Only the main character's losing matchups contribute, weighted by the **square**
-of their severity, so a sub that patches your hardest matchups outranks one that
-marginally improves many near-even ones. Opponents missing from the sub's data
-are treated as neutral (5.0). Three complementarity cross-checks accompany the
-score:
+Only the main character's losing matchups contribute by default, weighted by the
+**square** of their severity, so a sub that patches your hardest matchups
+outranks one that marginally improves many near-even ones. Opponents missing
+from the sub's data are treated as neutral (5.0). The per-opponent weight `u(O)`
+(default 1) lets you **exclude** a low-sample opponent (`u = 0`) or **target** a
+specific matchup (`u > 1`) even when you already win it — targeting injects a
+fixed 0.25 (a "slight disadvantage" worth) so its strength is independent of your
+worst matchup. Three complementarity cross-checks accompany the score:
 
 - **corr** — Pearson correlation between the sub's and main's full matchup
-  vectors; negative means the sub wins where the main loses (genuinely complementary).
+  vectors; negative means the sub wins where the main loses (complementary
+  *shape*). It measures profile shape, not coverage — COVER is the ranking; corr
+  is a supplementary cue.
 - **shared** — number of opponents both characters lose to (score < 4.9).
 - **w3win%** — the sub's average win rate against the main's three worst matchups.
 
@@ -154,10 +164,10 @@ Requires Python 3 (standard library only).
 
 ```bash
 cd scripts
-python3 download.py     --months 202601-202605          # fetch raw pages (idempotent cache)
+python3 download.py     --months 202502-202605          # fetch raw pages (idempotent cache)
 python3 build_matrix.py                                  # data/ → output/matrix.csv
-python3 analyze.py   --char TERRY --months 202601-202605 --profile current
-python3 recommend.py --char TERRY --months 202601-202605 --profile current
+python3 analyze.py   --char TERRY --months 202502-202605 --profile current
+python3 recommend.py --char TERRY --months 202502-202605 --profile current
 ```
 
 ### Parameters
@@ -165,7 +175,7 @@ python3 recommend.py --char TERRY --months 202601-202605 --profile current
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--char` | Character to analyse (e.g. `TERRY`, `KEN`) | required |
-| `--months` | Range (`202601-202605`) or explicit list | required |
+| `--months` | Range (`202502-202605`) or explicit list | required |
 | `--profile` | `current` (post-patch weighted) or `all` (equal) | `current` |
 | `--weights` | Custom per-month weights, e.g. `202604=1,202605=1` | overrides `--profile` |
 | `--exclude` | Opponents/candidates to drop | `INGRID` |

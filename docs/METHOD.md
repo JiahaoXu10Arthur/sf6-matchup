@@ -24,7 +24,8 @@ endpoint returns HTTP 403 to scripts because it requires a login session and
 has bot-protection. It also provides no monthly archive. kakuhanapp mirrors the
 same official Capcom numbers and exposes them with a stable monthly URL
 structure, giving 16 months of archive across the 202502–202605 window. The
-current pipeline covers 202601–202605.
+pipeline ingests the full 202502–202605 archive; `matrix.csv` and the web app
+carry all 16 months, and any sub-range can be selected at analysis time.
 
 Scores are parsed from matchup card elements matching the HTML pattern:
 `alt="([^"]+)">\s*<div class="card-body[^>]*>\s*<div class="text-muted small">([\d.]+)</div>`.
@@ -49,26 +50,37 @@ names are uppercase display names. Most slugs map trivially (e.g. `ryu` →
 
 Each character's page lists 29 opponents (every other character).
 
-## 3. Rank tiers and population weights
+## 3. Rank tiers and skill-depth weights
 
 kakuhanapp provides matchup data for four ranks: 36 (Master), 40 (High Master),
 41 (Grand Master), and 42 (Ultimate Master). This pipeline uses the three
-highest tiers — 40, 41, 42 — combined with population weights **3 : 2 : 1**
-(HighM : GrandM : UltM).
+highest tiers — 40, 41, 42 — combined with weights **1 : 2 : 3**
+(HighM : GrandM : UltM), i.e. **Ultimate Master is weighted most**.
 
-The weighting reflects a population pyramid: High Master has the largest player
-pool and is therefore the most statistically stable source; Ultimate Master has
-the smallest pool and is the noisiest. The site does not publish sample sizes —
-the 件 counts visible on the page are forum-post counts, not match counts — so
-3:2:1 is the best available proxy for population proportion.
+The rationale is *skill depth*, not sample size: the higher the rank, the deeper
+the players' understanding of the game, and the closer their matchup outcomes
+sit to the matchup's "true" character-vs-character value rather than to
+execution errors or gaps in matchup knowledge. Weighting Ultimate Master highest
+therefore privileges the most informed signal.
+
+This is a deliberate **bias/variance trade-off, made in favor of bias**. The
+trade is real and runs against pure variance-minimization: Ultimate Master has
+the smallest player pool and the highest month-to-month variance (empirically
+~2× High Master's), yet receives the largest weight — the opposite of what
+inverse-variance weighting would do. We accept the extra noise to track the most
+skilled population's read on each matchup. The spread flag (§6.3) surfaces cases
+where the tiers disagree enough that this noise matters. The site does not
+publish match-count sample sizes (the 件 counts on the page are forum-post
+counts), so true inverse-variance weighting is not available regardless.
 
 ## 4. Balance timeline and the month archive
 
-Two events in the Jan–May 2026 window drive all weight decisions:
+The archive spans 202502–202605 (16 months). Two events drive all weight
+decisions:
 
 - **2026-03-17**: Major all-character balance patch, released alongside ALEX.
-  This is the principal meta boundary. Data from 202601 and 202602 reflects the
-  pre-patch meta; data from 202604 and 202605 reflects the post-patch meta.
+  This is the principal meta boundary. Every month before 202603 (202502–202602)
+  reflects the pre-patch meta; 202604 onward reflects the post-patch meta.
   202603 is a mixed month: the patch landed on 17 March, so roughly half the
   month's match history is pre-patch and half post-patch.
 
@@ -77,14 +89,15 @@ Two events in the Jan–May 2026 window drive all weight decisions:
   matchup estimates — and is excluded by default (`--exclude INGRID`).
 
 ALEX was released with the March patch and therefore has data starting from
-202603 (three months of the five-month window). INGRID has data only in 202605.
+202603. INGRID has data only in 202605.
 
 kakuhanapp returns HTTP 500 for (character, month) combinations that predate a
 character's release. The downloader treats persistent HTTP errors as
-no-data events and writes empty marker files, keeping re-runs idempotent.
-Eighteen such empty files exist (ALEX × {202601, 202602} and
-INGRID × {202601–202604}, each across three ranks). The matrix builder skips
-them and reports each skip.
+no-data events and writes empty marker files, keeping re-runs idempotent. Over
+the full 16-month archive 136 such empty files exist — DLC characters before
+their release month, across the three ranks (e.g. INGRID, ALEX, C.VIPER, ELENA,
+SAGAT in the months preceding each one's launch). The matrix builder skips them
+and reports each skip.
 
 ## 5. Month weight profiles
 
@@ -92,14 +105,17 @@ Two named profiles are provided, plus fully custom weights:
 
 **`all`** — equal weight (1.0) across every requested month. This is the
 "full-window combined" view; it includes the pre-patch meta and is useful for
-seeing the overall Jan–May picture without patch-period emphasis.
+seeing the overall multi-month picture without patch-period emphasis.
 
-**`current`** (recommended for competitive rankings) — pre-patch months
-(202601, 202602) receive weight 0.0; the patch month (202603) receives 0.5;
-post-patch months (202604, 202605) receive 1.0. This privileges the current
-meta while giving partial credit to the transitional March data. If every
-requested month falls before the patch (i.e. all weights would be zero), the
-profile falls back to equal weights automatically to avoid an empty result.
+**`current`** (recommended for competitive rankings) — every month before the
+patch receives weight 0.0; the patch month (202603) receives 0.5; every
+post-patch month receives 1.0. Over the full 16-month archive this means all of
+202502–202602 (13 months) are zeroed — discarding pre-patch data is intentional,
+since a major all-character balance patch makes older matchups poor evidence for
+the current meta. It privileges the current meta while giving partial credit to
+the transitional March data. If every requested month falls before the patch
+(i.e. all weights would be zero), the profile falls back to equal weights
+automatically to avoid an empty result.
 
 **Custom weights** — `--weights 202601=0,202603=0.5,202604=1,202605=1` overrides
 the named profile entirely. Internally every function takes a plain
@@ -118,16 +134,18 @@ For each (character, opponent) pair, the pipeline computes:
 
 1. **Per-rank monthly average**: for each of the three tiers, a weighted
    average over the requested months using the active weight profile.
-2. **Tier-combined score**: the 3:2:1 weighted average over whichever tiers
+2. **Tier-combined score**: the 1:2:3 weighted average over whichever tiers
    have a non-null monthly average. If a tier has no data for the requested
    months it is simply omitted from the denominator rather than contributing
    zero.
 3. **Spread flag ⚠**: emitted when the maximum spread across available tier
    scores exceeds 0.25, indicating the matchup assessment diverges meaningfully
    across skill levels.
-4. **Months coverage** (e.g. `3/5`): the count of distinct months contributing
+4. **Months coverage** (e.g. `14/16`): the count of distinct months contributing
    at least one score row, shown as a fraction of the total months requested.
-   ALEX shows 3/5; all other non-INGRID characters show 5/5.
+   Characters released mid-archive (ALEX from 202603, INGRID from 202605) show a
+   reduced numerator; characters present for the whole requested range show the
+   full count (e.g. `16/16` over the full archive).
 
 ## 7. Anti-symmetry validation
 
@@ -141,10 +159,17 @@ exactly 10.0.
 `build_matrix.py` pairs every (month, rank, A, B) cell with its symmetric
 counterpart (month, rank, B, A) and computes the absolute deviation from 10.0
 for each pair. The pass criterion is **median deviation < 0.05**. The
-actual result over the Jan–May 2026 matrix: **6,009 pairs, median 0.0250, max
-0.3050**. The maximum is not a pass/fail criterion; it is printed for awareness.
-Worst deviations concentrate on low-population characters (INGRID, LILY, A.K.I.).
-Pairs with deviation > 0.2 are printed to the console.
+actual result over the full 202502–202605 matrix: **17,067 pairs, median 0.0230,
+max 0.3050**. The maximum is not a pass/fail criterion; it is printed for
+awareness. Worst deviations concentrate on low-population characters (INGRID,
+LILY, A.K.I.). Pairs with deviation > 0.2 are printed to the console.
+
+The median is the right robust statistic here: roughly a fifth of pairs
+legitimately exceed 0.05 because of the per-population asymmetry described above,
+so a mean or max criterion would fail on clean data. Note the test is blind to
+*directional* bias — because each pair is counted from both sides, the signed
+deviations cancel by construction. It validates that the two sides agree
+*on average*, not that any single character's numbers are unbiased.
 
 ## 8. Sub recommendation
 
@@ -155,21 +180,46 @@ ability to cover the main character's worst matchups.
 
 ```
 COVER = Σ w(O) · (sub_vs_O − 5.0) / Σ w(O)
-where w(O) = max(0, 5.0 − main_vs_O)²
+where w(O) = u(O) · sev(O) + max(0, u(O) − 1) · TARGET_INJECT
+      sev(O) = max(0, 5.0 − main_vs_O)²
 ```
 
-Only opponents where the main loses (main_vs_O < 5.0) contribute positive
-weight. The squared weighting concentrates attention on the worst matchups:
-an opponent at 4.0 receives weight 1.0 while an opponent at 4.9 receives only
-0.01. A positive COVER means the sub wins, on average, against the main's
-trouble opponents; a negative COVER means the sub shares or worsens those
-weaknesses.
+`sev(O)` is the main's weakness severity against opponent O: only opponents
+where the main loses (main_vs_O < 5.0) have positive severity. The squared
+weighting concentrates attention on the worst matchups — an opponent at 4.0 has
+severity 1.0 while an opponent at 4.9 has only 0.01. A positive COVER means the
+sub wins, on average, against the main's trouble opponents; a negative COVER
+means the sub shares or worsens those weaknesses.
+
+`u(O)` is a per-opponent **user weight** (default 1.0), exposed in the web app
+as a stepper per opponent:
+
+- **u = 1** (default) reproduces the plain weakness-weighted score exactly — the
+  injection term is zero, so normal rankings are undistorted.
+- **u = 0** drops the opponent entirely (e.g. low-sample characters like E.HONDA
+  or DHALSIM that few players have meaningful data against). This is the
+  "exclude a character" mechanism: a zero-weight opponent is removed from the
+  main's weakness profile *and* from every sub's coverage sum *and* from the
+  candidate list.
+- **u > 1** *targets* the opponent. The `max(0, u−1) · TARGET_INJECT` term adds
+  weight even when O is not a current weakness (sev = 0), so the user can ask
+  "find me a sub strong against this specific matchup" regardless of whether the
+  main already wins it. `TARGET_INJECT = 0.25` — the severity of a 4.5 "slight
+  disadvantage" — so targeting always counts an opponent as at least one
+  moderate weakness, a fixed amount independent of how bad the main's worst
+  matchup happens to be.
 
 **Complementarity columns**:
 
 - **corr**: Pearson correlation of the main's and sub's full matchup-score
-  vectors over shared opponents. A negative value means the sub and main have
-  opposite win/loss profiles — the strongest signal for complementarity.
+  vectors over shared opponents. This measures the *shape* of the two matchup
+  spreads, **not** coverage: a negative value means the sub and main have
+  opposite win/loss profiles (the sub tends to win where the main loses), which
+  is the signal used to surface the "most complementary" character. Because
+  Pearson correlation is mean/scale-invariant, a sub that is uniformly *better*
+  than the main but with the same profile shape will read as highly correlated
+  (apparently "redundant") even though it is a fine pick — so corr is a
+  supplementary shape cue only. COVER, not corr, is the actual coverage ranking.
 - **shared**: count of opponents where both characters score below 4.9. Fewer
   shared weaknesses is better.
 - **w3win%**: average win rate of the sub against the main's three worst
@@ -208,8 +258,9 @@ rather than any single tier's perspective.
 ## 10. Limitations
 
 - **No sample sizes.** The 件 figures visible on kakuhanapp pages are
-  forum-post counts, not match counts. No sample-size weighting is possible;
-  3:2:1 tier weighting is the only available proxy for data volume.
+  forum-post counts, not match counts. No sample-size or inverse-variance
+  weighting is possible; the 1:2:3 tier weighting is a deliberate skill-depth
+  choice (§3), not a data-volume estimate.
 - **INGRID data is minimal.** INGRID was released on 2026-05-27. The 202605
   matchup data covers only a few days of matches and is highly unstable. INGRID
   is excluded by default; re-including her (`--exclude` without INGRID) should
@@ -218,9 +269,11 @@ rather than any single tier's perspective.
   roughly in half. The `current` profile assigns it weight 0.5 as a compromise;
   no intra-month separation is available from the data source.
 - **Ultimate Master noise.** UltM has the smallest player population and
-  therefore the highest variance. The 1-weight in the 3:2:1 scheme limits its
-  influence, but outlier scores at UltM remain possible and are flagged by the
-  spread warning.
+  therefore the highest variance, yet the 1:2:3 scheme weights it *most* (§3) —
+  a deliberate bias toward the most skilled population at the cost of higher
+  variance. Outlier scores at UltM are correspondingly amplified; the spread
+  warning (§6.3) flags matchups where the tiers disagree enough for this to
+  matter.
 - **Per-population asymmetry.** As described in Section 7, A-vs-B and B-vs-A
   scores are drawn from different player populations and are not guaranteed to
   sum to 10.0. This is a property of the source data, not a pipeline artifact.

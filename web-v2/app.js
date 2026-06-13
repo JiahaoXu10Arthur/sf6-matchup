@@ -371,7 +371,7 @@ function renderSubs() {
     <span class="lb-name">${t('axisSub')}</span>
     <span class="lb-track-head">◄ ${t('hShared')} · ${t('hCover')} ►</span>
     <span class="lb-cover">${t('hCover')}</span>
-    <span class="lb-corr">${t('hCorr')}</span>
+    <span class="lb-corr" title="${t('corrHint')}">${t('hCorr')}</span>
     <span class="lb-w3">${t('hW3')}</span>
     <span class="lb-shared">${t('hShared')}</span>
   </div>`;
