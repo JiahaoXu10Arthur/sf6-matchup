@@ -27,17 +27,20 @@ const COLS = {
   subs: [['c-cover', 'main'], ['c-w3', 'sub'], ['c-corr', 'sub'], ['c-shared', 'sub']],
 };
 
-init();
-
 async function init() {
   setLang(lang);          // sync <html lang> with detected/stored language
   applyI18n();
-  const resp = await fetch('../output/matrix.csv');
-  if (!resp.ok) {
-    $('#loading').textContent = t('loadError');
-    return;
+  let csv;
+  if (typeof MATRIX_CSV !== 'undefined') {
+    csv = MATRIX_CSV;     // inlined by the standalone offline build
+  } else {
+    const resp = await fetch('../output/matrix.csv');
+    if (!resp.ok) {
+      $('#loading').textContent = t('loadError');
+      return;
+    }
+    csv = await resp.text();
   }
-  const csv = await resp.text();
   idx = buildIndex(csv);
   months = availableMonths(csv);
   state.monthW = monthWeights(months, 'current', PATCH_MONTH);
@@ -369,3 +372,5 @@ function renderSubs() {
     },
     sub => rows.findIndex(r => r.sub === sub));
 }
+
+init();   // run after all declarations are initialized (works for fetch + inlined builds)
