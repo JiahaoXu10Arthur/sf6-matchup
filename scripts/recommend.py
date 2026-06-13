@@ -68,7 +68,7 @@ def main():
             f"| {r['c41']:+.3f} | {r['c42']:+.3f} | {fmt(r['w3win'], 1)} "
             f"| {r['corr']:+.2f} | {r['shared']} |")
     text = '\n'.join(lines) + '\n'
-    out = ROOT / 'output' / f'{args.char}_subs_{label}.md'
+    out = ROOT / 'output' / f'{args.char}_subs_{months[0]}-{months[-1]}_{label}.md'
     out.write_text(text)
     print(text)
     print(f'-> {out}')

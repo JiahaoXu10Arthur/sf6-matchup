@@ -87,6 +87,8 @@ def main():
     months = expand_months(args.months)
     mw, label = resolve_weights(args, months)
     rows = char_table(args.char, months, mw, set(args.exclude))
+    if not rows:
+        ap.error(f'no data for character {args.char!r} — check spelling and month range')
 
     lines = [
         f'# {args.char} matchups — months {months[0]}–{months[-1]}, '
@@ -101,7 +103,7 @@ def main():
             f'| {opp} | {fmt(t40)} | {fmt(t41)} | {fmt(t42)} | **{comb:.3f}**'
             f'{noisy} | {spread:.3f} | {fmt(dpatch, 3)} | {nm}/{len(months)} |')
     text = '\n'.join(lines) + '\n'
-    out = ROOT / 'output' / f'{args.char}_{label}.md'
+    out = ROOT / 'output' / f'{args.char}_{months[0]}-{months[-1]}_{label}.md'
     out.write_text(text)
     print(text)
     print(f'-> {out}')
