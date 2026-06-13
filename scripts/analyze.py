@@ -3,20 +3,30 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
-from roster import PATCH_MONTH, RANKS, TIER_WEIGHTS
+from roster import PATCH_MONTH, TIER_WEIGHTS
 from scoring import expand_months, month_weights, parse_weights, wavg
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
+_MATRIX = None
+
+
+def _matrix():
+    global _MATRIX
+    if _MATRIX is None:
+        with (ROOT / 'output' / 'matrix.csv').open() as fh:
+            _MATRIX = list(csv.DictReader(fh))
+    return _MATRIX
+
+
 def load(char, months, exclude):
     """matrix.csv -> {opp: {rank: {month: score}}} for one character."""
     d = defaultdict(lambda: defaultdict(dict))
-    with (ROOT / 'output' / 'matrix.csv').open() as fh:
-        for row in csv.DictReader(fh):
-            if (row['char'] == char and row['month'] in months
-                    and row['opp'] not in exclude):
-                d[row['opp']][int(row['rank'])][row['month']] = float(row['score'])
+    for row in _matrix():
+        if (row['char'] == char and row['month'] in months
+                and row['opp'] not in exclude):
+            d[row['opp']][int(row['rank'])][row['month']] = float(row['score'])
     return d
 
 
@@ -47,6 +57,8 @@ def char_table(char, months, mw, exclude):
     for opp, byrank in data.items():
         tier = {r: wavg(byrank.get(r, {}), mw) for r in TIER_WEIGHTS}
         present = {r: v for r, v in tier.items() if v is not None}
+        if not present:
+            continue
         comb = (sum(v * TIER_WEIGHTS[r] for r, v in present.items())
                 / sum(TIER_WEIGHTS[r] for r in present))
         spread = max(present.values()) - min(present.values())
