@@ -21,6 +21,8 @@ def main():
     mw, label = resolve_weights(args, months)
 
     main_row = combined_row(args.char, months, mw, exclude)
+    if not main_row:
+        ap.error(f'no data for character {args.char!r} — check spelling and month range')
     worst3 = sorted(main_row, key=main_row.get)[:3]
     candidates = [n for n in NAME_BY_SLUG.values()
                   if n != args.char and n not in exclude]
