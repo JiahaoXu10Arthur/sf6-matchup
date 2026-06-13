@@ -20,7 +20,7 @@ SCORING = (WEB / 'scoring.js').read_text()
 CSV = (ROOT / 'output' / 'matrix.csv').read_text()
 
 
-def build(index_path, css_path, app_path, out_name, alt_href=None):
+def build(index_path, css_path, app_path, out_name):
     html = index_path.read_text()
     css = css_path.read_text()
     app = app_path.read_text()
@@ -36,9 +36,9 @@ def build(index_path, css_path, app_path, out_name, alt_href=None):
     # drop the external script tags; we inline everything below
     html = re.sub(r'[ \t]*<script src="[^"]*"></script>\n?', '', html)
 
-    # cross-link between the two standalone files (v2 -> dark)
-    if alt_href:
-        html = html.replace('href="../web/"', f'href="{alt_href}"')
+    # rewrite cross-links so the two standalone files point at each other
+    html = html.replace('href="../web-v2/"', 'href="sf6-matchup-tierlist.html"')
+    html = html.replace('href="../web/"', 'href="sf6-matchup-bars.html"')
 
     bundle = (
         f'<script>var MATRIX_CSV = {json.dumps(CSV)};</script>\n'
@@ -63,8 +63,7 @@ def main():
     build(WEB / 'index.html', WEB / 'style.css', WEB / 'app.js',
           'sf6-matchup-bars.html')
     build(ROOT / 'web-v2' / 'index.html', ROOT / 'web-v2' / 'style.css',
-          ROOT / 'web-v2' / 'app.js', 'sf6-matchup-tierlist.html',
-          alt_href='sf6-matchup-bars.html')
+          ROOT / 'web-v2' / 'app.js', 'sf6-matchup-tierlist.html')
 
 
 if __name__ == '__main__':

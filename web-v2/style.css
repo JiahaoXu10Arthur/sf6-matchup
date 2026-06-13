@@ -224,9 +224,13 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .lanes { display: flex; flex-direction: column; gap: var(--space-2); }
 
 .lane {
-  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--tier-color, var(--line));
+  background: linear-gradient(180deg, var(--raised), var(--surface));
+  border: 1px solid var(--line); border-left: 3px solid var(--tier-color, var(--line));
   border-radius: 8px; padding: var(--space-2) var(--space-3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: border-color var(--dur) var(--ease);
 }
+.lane:hover { border-left-width: 5px; }
 .lane.t-dis { --tier-color: var(--t-dis); }
 .lane.t-sdis { --tier-color: var(--t-sdis); }
 .lane.t-even { --tier-color: var(--t-even); }
