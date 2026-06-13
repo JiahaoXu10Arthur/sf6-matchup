@@ -21,9 +21,11 @@ const COVER_HALF = 0.4;   // sub COVER bar full deflection at |cover| = 0.4
 init();
 
 async function init() {
+  setLang(lang);          // sync <html lang> with detected/stored language
+  applyI18n();
   const resp = await fetch('../output/matrix.csv');
   if (!resp.ok) {
-    $('#loading').textContent = 'Could not load ../output/matrix.csv — run build_matrix.py first.';
+    $('#loading').textContent = t('loadError');
     return;
   }
   const csv = await resp.text();
@@ -36,6 +38,18 @@ async function init() {
   buildTierSliders();
   wireControls();
   render();
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el =>
+    el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-html]').forEach(el =>
+    el.innerHTML = t(el.dataset.i18nHtml));
+  document.querySelectorAll('[data-i18n-rank]').forEach(el =>
+    el.textContent = t('rank')[el.dataset.i18nRank]);
+  document.querySelectorAll('.lang-switch button').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang));
+  $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
 }
 
 function exclude() {
@@ -87,7 +101,7 @@ function buildTierSliders() {
   const box = $('#tier-sliders');
   box.textContent = '';
   for (const r of ['40', '41', '42']) {
-    box.appendChild(sliderRow(RANK_NAMES[r], state.tierW[r], 5, 0.5, v => {
+    box.appendChild(sliderRow(t('rankFull')[r], state.tierW[r], 5, 0.5, v => {
       state.tierW[r] = v;
       render();
     }));
@@ -108,8 +122,17 @@ function wireControls() {
         x.classList.toggle('active', x === b);
         x.setAttribute('aria-selected', x === b);
       });
-      $('#view-label').textContent = state.view === 'match' ? 'MATCHUPS' : 'SUB FINDER';
+      $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
       $('#rows').textContent = '';   // column meaning changes — rebuild rows
+      render();
+    }));
+
+  document.querySelectorAll('.lang-switch button').forEach(b =>
+    b.addEventListener('click', () => {
+      if (b.dataset.lang === lang) return;
+      setLang(b.dataset.lang);
+      applyI18n();
+      buildTierSliders();   // slider names are localized
       render();
     }));
 
@@ -199,13 +222,13 @@ function renderMatchups() {
                     .sort((a, b) => metric(a) - metric(b));
   const byOpp = new Map(rows.map(r => [r.opp, r]));
 
-  $('#canvas-head').innerHTML =
-    `<b>${state.char}</b> vs ${rows.length} · sorted worst-first · ` +
-    `metric: <b>${state.rank === 'comb' ? 'COMB (tier-weighted)' : RANK_NAMES[state.rank]}</b>` +
-    ` · ⚠ tier spread &gt; 0.25`;
-  $('#axis').innerHTML = `<span>OPPONENT</span>
-    <span class="axis-bar"><span>◄ LOSING</span><span>5.0</span><span>WINNING ►</span></span>
-    <span style="text-align:right">SCORE · <span class="axis-nums-extra">ΔPATCH · MO</span></span>`;
+  $('#canvas-head').innerHTML = t('headMatch', {
+    char: state.char, n: rows.length,
+    metric: state.rank === 'comb' ? t('metricComb') : t('rankFull')[state.rank],
+  });
+  $('#axis').innerHTML = `<span>${t('axisOpponent')}</span>
+    <span class="axis-bar"><span>${t('axisLosing')}</span><span>${t('axisEven')}</span><span>${t('axisWinning')}</span></span>
+    <span style="text-align:right">${t('axisScore')}<span class="axis-nums-extra">${t('axisScoreExtra')}</span></span>`;
 
   syncRows(rows.map(r => r.opp),
     () => rowSkeleton([1, 2]),
@@ -213,14 +236,14 @@ function renderMatchups() {
       const r = byOpp.get(opp);
       const v = metric(r);
       el.querySelector('.name').innerHTML =
-        opp + (r.spread > 0.25 ? '<span class="flag" title="tier spread > 0.25">⚠</span>' : '');
+        opp + (r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '');
       setBar(el, (v - 5.0) / BAR_HALF);
       const [main, d, mo] = el.querySelectorAll('.nums > *');
       main.textContent = fmt(v);
       main.className = 'main-num ' + (v >= 5 ? 'adv' : 'dis');
       d.textContent = 'Δ ' + sfmt(r.dpatch);
       d.className = 'sub-num';
-      mo.textContent = `${r.nmonths}/${months.length}mo`;
+      mo.textContent = `${r.nmonths}/${months.length}${t('moSuffix')}`;
       mo.className = 'sub-num';
     },
     opp => rows.findIndex(r => r.opp === opp));
@@ -233,13 +256,14 @@ function renderSubs() {
   const rows = results.slice().sort((a, b) => metric(b) - metric(a));
   const bySub = new Map(rows.map(r => [r.sub, r]));
 
-  $('#canvas-head').innerHTML =
-    `Subs for <b>${state.char}</b> · worst 3: ` +
-    worst3.map(o => `<b>${o}</b> ${mainRow[o].toFixed(3)}`).join(' · ') +
-    ` · metric: <b>COVER${state.rank === 'comb' ? '' : '@' + RANK_NAMES[state.rank]}</b>`;
-  $('#axis').innerHTML = `<span>SUB</span>
-    <span class="axis-bar"><span>◄ SHARES WEAKNESS</span><span>0</span><span>COVERS ►</span></span>
-    <span style="text-align:right">COVER · <span class="axis-nums-extra">W3% · CORR · SHARED</span></span>`;
+  $('#canvas-head').innerHTML = t('headSubs', {
+    char: state.char,
+    worst3: worst3.map(o => `<b>${o}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
+    metric: `COVER${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
+  });
+  $('#axis').innerHTML = `<span>${t('axisSub')}</span>
+    <span class="axis-bar"><span>${t('axisShares')}</span><span>${t('axisZero')}</span><span>${t('axisCovers')}</span></span>
+    <span style="text-align:right">${t('axisCover')}<span class="axis-nums-extra">${t('axisCoverExtra')}</span></span>`;
 
   syncRows(rows.map(r => r.sub),
     () => rowSkeleton([1, 2, 3]),
@@ -255,7 +279,7 @@ function renderSubs() {
       w3.className = 'sub-num';
       corr.textContent = 'r ' + sfmt(r.corr, 2);
       corr.className = 'sub-num ' + (r.corr <= -0.1 ? 'neg' : r.corr >= 0.1 ? 'pos' : '');
-      sh.textContent = r.shared + ' shared';
+      sh.textContent = r.shared + t('sharedSuffix');
       sh.className = 'sub-num ' + (r.shared >= 2 ? 'pos' : '');
     },
     sub => rows.findIndex(r => r.sub === sub));

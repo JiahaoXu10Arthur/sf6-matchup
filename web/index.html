@@ -15,62 +15,68 @@
 
   <header class="masthead">
     <div class="masthead-title">
-      <span class="kicker">CAPCOM BUCKLER DATA · MASTER+</span>
+      <span class="kicker" data-i18n="kicker">CAPCOM BUCKLER DATA · MASTER+</span>
       <h1>SF6 <em>MATCHUP</em> LAB</h1>
     </div>
-    <div class="masthead-char">
-      <span class="char-label" id="view-label">MATCHUPS</span>
-      <span class="char-name" id="char-name">TERRY</span>
+    <div class="masthead-right">
+      <div class="lang-switch" role="group" aria-label="Language">
+        <button data-lang="en" class="active">EN</button>
+        <button data-lang="zh">中</button>
+      </div>
+      <div class="masthead-char">
+        <span class="char-label" id="view-label">MATCHUPS</span>
+        <span class="char-name" id="char-name">TERRY</span>
+      </div>
     </div>
   </header>
 
   <div class="layout">
     <aside class="rail" aria-label="Controls">
       <nav class="view-switch" role="tablist" aria-label="View">
-        <button role="tab" aria-selected="true" data-view="match" class="active">Matchups</button>
-        <button role="tab" aria-selected="false" data-view="subs">Sub finder</button>
+        <button role="tab" aria-selected="true" data-view="match" class="active" data-i18n="viewMatch">Matchups</button>
+        <button role="tab" aria-selected="false" data-view="subs" data-i18n="viewSubs">Sub finder</button>
       </nav>
 
       <section class="control">
-        <label class="control-label" for="char-select">Character</label>
+        <label class="control-label" for="char-select" data-i18n="character">Character</label>
         <select id="char-select"></select>
       </section>
 
       <section class="control">
-        <span class="control-label" id="rank-label">Rank view</span>
+        <span class="control-label" id="rank-label" data-i18n="rankView">Rank view</span>
         <div class="rank-tabs" role="tablist" aria-labelledby="rank-label">
           <button role="tab" data-rank="comb" class="active" aria-selected="true">COMB</button>
-          <button role="tab" data-rank="40" aria-selected="false">High</button>
-          <button role="tab" data-rank="41" aria-selected="false">Grand</button>
-          <button role="tab" data-rank="42" aria-selected="false">Ult</button>
+          <button role="tab" data-rank="40" aria-selected="false" data-i18n-rank="40">High</button>
+          <button role="tab" data-rank="41" aria-selected="false" data-i18n-rank="41">Grand</button>
+          <button role="tab" data-rank="42" aria-selected="false" data-i18n-rank="42">Ult</button>
         </div>
       </section>
 
       <section class="control">
         <div class="control-head">
-          <span class="control-label">Month weights</span>
+          <span class="control-label" data-i18n="monthWeights">Month weights</span>
           <div class="presets">
-            <button data-preset="current" class="active">current</button>
-            <button data-preset="all">all</button>
+            <button data-preset="current" class="active" data-i18n="presetCurrent">current</button>
+            <button data-preset="all" data-i18n="presetAll">all</button>
           </div>
         </div>
         <div id="month-sliders"></div>
       </section>
 
       <section class="control">
-        <span class="control-label">Tier weights <small>(COMB mix)</small></span>
+        <span class="control-label"><span data-i18n="tierWeights">Tier weights</span> <small data-i18n="combMix">(COMB mix)</small></span>
         <div id="tier-sliders"></div>
       </section>
 
       <section class="control">
         <label class="check">
           <input type="checkbox" id="include-ingrid">
-          <span>Include INGRID <small>(~3 days of data)</small></span>
+          <span><span data-i18n="includeIngrid">Include INGRID</span> <small data-i18n="ingridNote">(~3 days of data)</small></span>
         </label>
       </section>
 
       <footer class="rail-foot">
-        <p>Scores are win-rate ÷ 10, centered at 5.0.<br>
+        <p data-i18n-html="footer">Scores are win-rate ÷ 10, centered at 5.0.<br>
         Data: kakuhanapp.com mirror of official Buckler diagrams.</p>
       </footer>
     </aside>
@@ -79,10 +85,11 @@
       <div class="canvas-head" id="canvas-head"></div>
       <div class="axis" id="axis" aria-hidden="true"></div>
       <div class="rows" id="rows" aria-live="polite"></div>
-      <p class="loading" id="loading">Loading matrix…</p>
+      <p class="loading" id="loading" data-i18n="loading">Loading matrix…</p>
     </main>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="scoring.js"></script>
   <script src="app.js"></script>
 </body>
