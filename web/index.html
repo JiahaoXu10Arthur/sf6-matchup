@@ -63,9 +63,10 @@
         <div id="month-sliders"></div>
       </section>
 
-      <section class="control">
+      <section class="control" id="tier-control">
         <span class="control-label"><span data-i18n="tierWeights">Tier weights</span> <small data-i18n="combMix">(COMB mix)</small></span>
         <div id="tier-sliders"></div>
+        <small class="tier-hint" id="tier-hint" data-i18n="tierHint">COMB only — pick COMB above</small>
       </section>
 
       <section class="control">
@@ -74,6 +75,8 @@
           <span><span data-i18n="includeIngrid">Include INGRID</span> <small data-i18n="ingridNote">(~3 days of data)</small></span>
         </label>
       </section>
+
+      <button class="reset-btn" id="reset-btn" data-i18n="reset">Reset to defaults</button>
 
       <footer class="rail-foot">
         <p data-i18n-html="footer">Scores are win-rate ÷ 10, centered at 5.0.<br>

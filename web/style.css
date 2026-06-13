@@ -230,7 +230,7 @@ select:focus-visible, button:focus-visible, input:focus-visible {
 
 .slider-row {
   display: grid;
-  grid-template-columns: 4.2rem 1fr 2.4rem;
+  grid-template-columns: 4.8rem 1fr 2.2rem;
   align-items: center; gap: 0.6rem;
   padding: 0.28rem 0;
 }
@@ -285,6 +285,30 @@ input[type="range"]::-moz-range-thumb {
   margin: 0; line-height: 1.5;
 }
 
+/* tier weights disabled when a single rank is in view (COMB-only control) */
+.control.disabled #tier-sliders { opacity: 0.35; pointer-events: none; }
+.tier-hint {
+  display: none;
+  font-family: var(--font-display);
+  font-size: 0.62rem; letter-spacing: 0.04em;
+  color: var(--accent);
+  margin-top: var(--space-1);
+}
+.control.disabled .tier-hint { display: block; }
+
+.reset-btn {
+  font-family: var(--font-display);
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.55rem;
+  background: var(--surface); color: var(--text-dim);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+
+.reset-btn:hover { color: var(--accent); border-color: var(--accent); }
+
 /* ---------- canvas ---------- */
 
 .canvas { min-width: 0; }
@@ -299,12 +323,15 @@ input[type="range"]::-moz-range-thumb {
 
 .canvas-head b { color: var(--text); font-weight: 600; }
 
+body.view-match { --num-col: 12.6rem; }
+body.view-subs { --num-col: 16.8rem; }
+
 .axis {
   display: grid;
-  grid-template-columns: var(--name-col, 7.5rem) 1fr var(--num-col, 11rem);
+  grid-template-columns: var(--name-col, 7.5rem) 1fr var(--num-col, 12.6rem);
   gap: var(--space-2);
   font-family: var(--font-display);
-  font-size: 0.6rem; letter-spacing: 0.15em;
+  font-size: 0.6rem; letter-spacing: 0.12em;
   color: var(--text-dim);
   padding-bottom: 0.3rem;
   border-bottom: 1px solid var(--line);
@@ -322,7 +349,7 @@ input[type="range"]::-moz-range-thumb {
 
 .row {
   display: grid;
-  grid-template-columns: var(--name-col, 7.5rem) 1fr var(--num-col, 11rem);
+  grid-template-columns: var(--name-col, 7.5rem) 1fr var(--num-col, 12.6rem);
   gap: var(--space-2);
   align-items: center;
   padding: 0.22rem 0;
@@ -366,30 +393,40 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 10px oklch(68% 0.19 40 / 0.25);
 }
 
-.row .nums {
-  display: flex; justify-content: flex-end; gap: 0.9rem;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.78rem;
-  white-space: nowrap;
+/* Shared numeric columns: identical fixed widths in the axis header and every
+   data row, so values line up under their labels in both languages. */
+.nums {
+  display: flex; justify-content: flex-end; gap: 0.55rem;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
-.row .nums .main-num {
-  font-family: var(--font-display); font-weight: 700; font-size: 0.85rem;
-  min-width: 3.2rem; text-align: right;
-}
+.row .nums { font-size: 0.78rem; }
 
-.row .nums .main-num.adv { color: var(--adv); }
-.row .nums .main-num.dis { color: var(--dis); }
-.row .nums .sub-num { color: var(--text-dim); min-width: 3rem; text-align: right; }
-.row .nums .sub-num.neg { color: var(--adv); }
-.row .nums .sub-num.pos { color: var(--dis); }
+.col-main { font-family: var(--font-display); font-weight: 700; text-align: right; }
+.col-sub { color: var(--text-dim); text-align: right; }
+
+.row .nums .col-main { font-size: 0.85rem; }
+.col-main.adv { color: var(--adv); }
+.col-main.dis { color: var(--dis); }
+.col-sub.neg { color: var(--adv); }
+.col-sub.pos { color: var(--dis); }
+
+/* per-column fixed widths (match view) */
+.c-score { width: 3.6rem; }
+.c-dpatch { width: 4.4rem; }
+.c-mo { width: 3.4rem; }
+/* per-column fixed widths (subs view) */
+.c-cover { width: 3.6rem; }
+.c-w3 { width: 3.4rem; }
+.c-corr { width: 3.8rem; }
+.c-shared { width: 4.2rem; }
 
 .loading { color: var(--text-dim); font-family: var(--font-display); letter-spacing: 0.1em; }
 
 @media (max-width: 640px) {
-  :root { --name-col: 5.8rem; --num-col: 5.5rem; }
-  .row .nums .sub-num { display: none; }
-  .axis .axis-nums-extra { display: none; }
+  :root { --name-col: 6.2rem; }
+  body.view-match, body.view-subs { --num-col: 4rem; }
+  .col-sub { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

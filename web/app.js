@@ -18,6 +18,15 @@ const $ = sel => document.querySelector(sel);
 const BAR_HALF = 0.6;     // matchup bar full deflection at |score - 5| = 0.6
 const COVER_HALF = 0.4;   // sub COVER bar full deflection at |cover| = 0.4
 
+const DEFAULT_TIER = { 40: 3, 41: 2, 42: 1 };
+
+// numeric column layout per view: [widthClass, 'main'|'sub'] — shared by the
+// axis header and data rows so fixed widths keep both vertically aligned.
+const COLS = {
+  match: [['c-score', 'main'], ['c-dpatch', 'sub'], ['c-mo', 'sub']],
+  subs: [['c-cover', 'main'], ['c-w3', 'sub'], ['c-corr', 'sub'], ['c-shared', 'sub']],
+};
+
 init();
 
 async function init() {
@@ -112,6 +121,31 @@ function buildTierSliders() {
   }
 }
 
+/* Tier weights only affect the COMB metric; disable them for single-rank views. */
+function updateTierState() {
+  const active = state.rank === 'comb';
+  const sec = $('#tier-control');
+  sec.classList.toggle('disabled', !active);
+  sec.querySelectorAll('input').forEach(i => { i.disabled = !active; });
+}
+
+function resetDefaults() {
+  state.rank = 'comb';
+  state.tierW = { ...DEFAULT_TIER };
+  state.includeIngrid = false;
+  setPreset('current');
+  state.monthW = monthWeights(months, 'current', PATCH_MONTH);
+  document.querySelectorAll('.rank-tabs button').forEach(x => {
+    const on = x.dataset.rank === 'comb';
+    x.classList.toggle('active', on);
+    x.setAttribute('aria-selected', on);
+  });
+  $('#include-ingrid').checked = false;
+  buildMonthSliders();
+  buildTierSliders();
+  render();
+}
+
 function setPreset(p) {
   state.preset = p;
   document.querySelectorAll('.presets button').forEach(b =>
@@ -168,6 +202,8 @@ function wireControls() {
     state.includeIngrid = e.target.checked;
     render();
   });
+
+  $('#reset-btn').addEventListener('click', resetDefaults);
 }
 
 /* ---------- rendering ---------- */
@@ -177,6 +213,9 @@ const sfmt = (v, nd = 3) => v === null || v === undefined ? '—'
   : (v >= 0 ? '+' : '') + v.toFixed(nd);
 
 function render() {
+  document.body.classList.toggle('view-match', state.view === 'match');
+  document.body.classList.toggle('view-subs', state.view === 'subs');
+  updateTierState();
   if (state.view === 'match') renderMatchups(); else renderSubs();
 }
 
@@ -202,14 +241,21 @@ function syncRows(keys, makeRow, updateRow, orderOf) {
   }
 }
 
-function rowSkeleton(subCols) {
+function rowSkeleton(cols) {
   const el = document.createElement('div');
   el.className = 'row';
   el.innerHTML = `<span class="name"></span>
     <div class="bar-track"><div class="bar"></div></div>
-    <div class="nums"><span class="main-num"></span>${
-      subCols.map(() => '<span class="sub-num"></span>').join('')}</div>`;
+    <div class="nums">${cols.map(([w, ty]) =>
+      `<span class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}"></span>`).join('')}</div>`;
   return el;
+}
+
+function axisHtml(leftLabel, barLabels, cols, headers) {
+  return `<span>${leftLabel}</span>
+    <span class="axis-bar"><span>${barLabels[0]}</span><span>${barLabels[1]}</span><span>${barLabels[2]}</span></span>
+    <div class="nums">${cols.map(([w, ty], i) =>
+      `<span class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}">${headers[i]}</span>`).join('')}</div>`;
 }
 
 function setBar(el, frac) {
@@ -230,12 +276,13 @@ function renderMatchups() {
     char: cn(state.char), n: rows.length,
     metric: state.rank === 'comb' ? t('metricComb') : t('rankFull')[state.rank],
   });
-  $('#axis').innerHTML = `<span>${t('axisOpponent')}</span>
-    <span class="axis-bar"><span>${t('axisLosing')}</span><span>${t('axisEven')}</span><span>${t('axisWinning')}</span></span>
-    <span style="text-align:right">${t('axisScore')}<span class="axis-nums-extra">${t('axisScoreExtra')}</span></span>`;
+  $('#axis').innerHTML = axisHtml(
+    t('axisOpponent'),
+    [t('axisLosing'), t('axisEven'), t('axisWinning')],
+    COLS.match, [t('hScore'), t('hDpatch'), t('hMo')]);
 
   syncRows(rows.map(r => r.opp),
-    () => rowSkeleton([1, 2]),
+    () => rowSkeleton(COLS.match),
     (el, opp) => {
       const r = byOpp.get(opp);
       const v = metric(r);
@@ -244,11 +291,10 @@ function renderMatchups() {
       setBar(el, (v - 5.0) / BAR_HALF);
       const [main, d, mo] = el.querySelectorAll('.nums > *');
       main.textContent = fmt(v);
-      main.className = 'main-num ' + (v >= 5 ? 'adv' : 'dis');
+      main.classList.toggle('adv', v >= 5);
+      main.classList.toggle('dis', v < 5);
       d.textContent = 'Δ ' + sfmt(r.dpatch);
-      d.className = 'sub-num';
       mo.textContent = `${r.nmonths}/${months.length}${t('moSuffix')}`;
-      mo.className = 'sub-num';
     },
     opp => rows.findIndex(r => r.opp === opp));
 }
@@ -265,12 +311,13 @@ function renderSubs() {
     worst3: worst3.map(o => `<b>${cn(o)}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
     metric: `COVER${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
-  $('#axis').innerHTML = `<span>${t('axisSub')}</span>
-    <span class="axis-bar"><span>${t('axisShares')}</span><span>${t('axisZero')}</span><span>${t('axisCovers')}</span></span>
-    <span style="text-align:right">${t('axisCover')}<span class="axis-nums-extra">${t('axisCoverExtra')}</span></span>`;
+  $('#axis').innerHTML = axisHtml(
+    t('axisSub'),
+    [t('axisShares'), t('axisZero'), t('axisCovers')],
+    COLS.subs, [t('hCover'), t('hW3'), t('hCorr'), t('hShared')]);
 
   syncRows(rows.map(r => r.sub),
-    () => rowSkeleton([1, 2, 3]),
+    () => rowSkeleton(COLS.subs),
     (el, sub) => {
       const r = bySub.get(sub);
       const v = metric(r);
@@ -278,13 +325,14 @@ function renderSubs() {
       setBar(el, v / COVER_HALF);
       const [main, w3, corr, sh] = el.querySelectorAll('.nums > *');
       main.textContent = sfmt(v);
-      main.className = 'main-num ' + (v >= 0 ? 'adv' : 'dis');
+      main.classList.toggle('adv', v >= 0);
+      main.classList.toggle('dis', v < 0);
       w3.textContent = fmt(r.w3win, 1) + '%';
-      w3.className = 'sub-num';
       corr.textContent = 'r ' + sfmt(r.corr, 2);
-      corr.className = 'sub-num ' + (r.corr <= -0.1 ? 'neg' : r.corr >= 0.1 ? 'pos' : '');
+      corr.classList.toggle('neg', r.corr <= -0.1);
+      corr.classList.toggle('pos', r.corr >= 0.1);
       sh.textContent = r.shared + t('sharedSuffix');
-      sh.className = 'sub-num ' + (r.shared >= 2 ? 'pos' : '');
+      sh.classList.toggle('pos', r.shared >= 2);
     },
     sub => rows.findIndex(r => r.sub === sub));
 }
