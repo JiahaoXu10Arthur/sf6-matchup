@@ -438,7 +438,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 body.view-match { --num-col: 12.6rem; }
-body.view-subs { --num-col: 16.8rem; }
+body.view-subs { --num-col: 24rem; }
 
 .axis {
   display: grid;
@@ -512,9 +512,11 @@ body.view-subs { --num-col: 16.8rem; }
 /* Shared numeric columns: identical fixed widths in the axis header and every
    data row, so values line up under their labels in both languages. */
 .nums {
-  display: flex; justify-content: flex-end; gap: 0.55rem;
+  display: flex; justify-content: flex-end; gap: 0.7rem;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+/* separate the score group (COVER/SPEC/STR) from the cue group (W3/CORR/SHARED) */
+.nums .c-w3 { margin-left: 0.6rem; }
 
 .row .nums { font-size: 0.78rem; }
 
@@ -537,12 +539,12 @@ body.view-subs { --num-col: 16.8rem; }
 .c-dpatch { width: 4.4rem; }
 .c-mo { width: 3.4rem; }
 /* per-column fixed widths (subs view) */
-.c-cover { width: 3.6rem; }
-.c-spec { width: 3.6rem; }
-.c-str { width: 3.2rem; }
-.c-w3 { width: 3.4rem; }
-.c-corr { width: 3.8rem; }
-.c-shared { width: 4.2rem; }
+.c-cover { width: 3.5rem; }
+.c-spec { width: 3.5rem; }
+.c-str { width: 2.9rem; }
+.c-w3 { width: 3.3rem; }
+.c-corr { width: 3.1rem; }
+.c-shared { width: 3.2rem; }
 
 .loading { color: var(--text-dim); font-family: var(--font-display); letter-spacing: 0.1em; }
 

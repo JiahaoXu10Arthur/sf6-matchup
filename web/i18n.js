@@ -51,7 +51,6 @@ const STRINGS = {
     tierEmpty: 'none', chipHint: 'click a character to scout them',
     spreadFlag: 'tier spread > 0.25',
     moSuffix: 'mo',
-    sharedSuffix: ' shared',
   },
   zh: {
     kicker: 'CAPCOM BUCKLER 官方数据 · 大师段位以上',
@@ -103,7 +102,6 @@ const STRINGS = {
     tierEmpty: '无', chipHint: '点击角色查看其对局',
     spreadFlag: '段位间差异 > 0.25',
     moSuffix: '月',
-    sharedSuffix: ' 共弱',
   },
 };
 

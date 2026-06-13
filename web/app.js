@@ -476,10 +476,10 @@ function renderSubs() {
       str.classList.toggle('adv', r.strength >= 5.05);
       str.classList.toggle('dis', r.strength <= 4.95);
       w3.textContent = fmt(r.w3win, 1) + '%';
-      corr.textContent = 'r ' + sfmt(r.corr, 2);
+      corr.textContent = sfmt(r.corr, 2);
       corr.classList.toggle('neg', r.corr <= -0.1);
       corr.classList.toggle('pos', r.corr >= 0.1);
-      sh.textContent = r.shared + t('sharedSuffix');
+      sh.textContent = String(r.shared);
       sh.classList.toggle('pos', r.shared >= 2);
     },
     sub => rows.findIndex(r => r.sub === sub));
