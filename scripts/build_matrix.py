@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def main():
     rows, skipped = [], []
     for f in sorted((ROOT / 'data').glob('*.html')):
-        slug, rank, month = f.stem.split('_')
+        slug, rank, month = f.stem.rsplit('_', 2)
         html = f.read_text(errors='replace')
         matchups = parse_matchups(html)
         if not matchups:
@@ -29,6 +29,7 @@ def main():
             rows.append((month, rank, NAME_BY_SLUG[slug], opp, score))
 
     out = ROOT / 'output' / 'matrix.csv'
+    out.parent.mkdir(exist_ok=True)
     with out.open('w', newline='') as fh:
         w = csv.writer(fh)
         w.writerow(['month', 'rank', 'char', 'opp', 'score'])
@@ -40,8 +41,11 @@ def main():
     print(f'{len(rows)} rows -> {out}')
     for name, why in skipped:
         print(f'  skipped {name}: {why}')
-    print(f'anti-symmetry: {len(devs)} pairs, median {median(devs):.4f} '
-          f'(pass < 0.05), max {max(devs):.4f}')
+    if devs:
+        print(f'anti-symmetry: {len(devs) // 2} pairs, median {median(devs):.4f} '
+              f'(pass < 0.05), max {max(devs):.4f}')
+    else:
+        print('anti-symmetry: no symmetric pairs found')
 
 
 if __name__ == '__main__':
