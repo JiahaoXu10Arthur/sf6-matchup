@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SF6 Matchup Lab</title>
+  <meta name="description" content="Interactive Street Fighter 6 matchup explorer and sub-character finder, built on Capcom Buckler diagram data.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="masthead">
+    <div class="masthead-title">
+      <span class="kicker">CAPCOM BUCKLER DATA · MASTER+</span>
+      <h1>SF6 <em>MATCHUP</em> LAB</h1>
+    </div>
+    <div class="masthead-char">
+      <span class="char-label" id="view-label">MATCHUPS</span>
+      <span class="char-name" id="char-name">TERRY</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail" aria-label="Controls">
+      <nav class="view-switch" role="tablist" aria-label="View">
+        <button role="tab" aria-selected="true" data-view="match" class="active">Matchups</button>
+        <button role="tab" aria-selected="false" data-view="subs">Sub finder</button>
+      </nav>
+
+      <section class="control">
+        <label class="control-label" for="char-select">Character</label>
+        <select id="char-select"></select>
+      </section>
+
+      <section class="control">
+        <span class="control-label" id="rank-label">Rank view</span>
+        <div class="rank-tabs" role="tablist" aria-labelledby="rank-label">
+          <button role="tab" data-rank="comb" class="active" aria-selected="true">COMB</button>
+          <button role="tab" data-rank="40" aria-selected="false">High</button>
+          <button role="tab" data-rank="41" aria-selected="false">Grand</button>
+          <button role="tab" data-rank="42" aria-selected="false">Ult</button>
+        </div>
+      </section>
+
+      <section class="control">
+        <div class="control-head">
+          <span class="control-label">Month weights</span>
+          <div class="presets">
+            <button data-preset="current" class="active">current</button>
+            <button data-preset="all">all</button>
+          </div>
+        </div>
+        <div id="month-sliders"></div>
+      </section>
+
+      <section class="control">
+        <span class="control-label">Tier weights <small>(COMB mix)</small></span>
+        <div id="tier-sliders"></div>
+      </section>
+
+      <section class="control">
+        <label class="check">
+          <input type="checkbox" id="include-ingrid">
+          <span>Include INGRID <small>(~3 days of data)</small></span>
+        </label>
+      </section>
+
+      <footer class="rail-foot">
+        <p>Scores are win-rate ÷ 10, centered at 5.0.<br>
+        Data: kakuhanapp.com mirror of official Buckler diagrams.</p>
+      </footer>
+    </aside>
+
+    <main class="canvas">
+      <div class="canvas-head" id="canvas-head"></div>
+      <div class="axis" id="axis" aria-hidden="true"></div>
+      <div class="rows" id="rows" aria-live="polite"></div>
+      <p class="loading" id="loading">Loading matrix…</p>
+    </main>
+  </div>
+
+  <script src="scoring.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
