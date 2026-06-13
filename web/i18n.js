@@ -129,6 +129,29 @@ const ROSTER_ORDER = [
 let lang = localStorage.getItem('sf6lab-lang')
   || (navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en');
 
+/* Display name -> URL slug, for headshot images at IMG_BASE + slug + '.jpg'. */
+const SLUG_BY_NAME = {
+  'A.K.I.': 'aki', 'ALEX': 'alex', 'BLANKA': 'blanka', 'CAMMY': 'cammy',
+  'CHUN-LI': 'chunli', 'C.VIPER': 'cviper', 'DEE JAY': 'deejay', 'DHALSIM': 'dhalsim',
+  'ED': 'ed', 'ELENA': 'elena', 'GOUKI': 'gouki', 'GUILE': 'guile', 'E.HONDA': 'honda',
+  'INGRID': 'ingrid', 'JAMIE': 'jamie', 'JP': 'jp', 'JURI': 'juri', 'KEN': 'ken',
+  'KIMBERLY': 'kimberly', 'LILY': 'lily', 'LUKE': 'luke', 'MAI': 'mai', 'MANON': 'manon',
+  'MARISA': 'marisa', 'RASHID': 'rashid', 'RYU': 'ryu', 'SAGAT': 'sagat', 'TERRY': 'terry',
+  'VEGA': 'vega', 'ZANGIEF': 'zangief',
+};
+
+// base path for headshots; web-v2 overrides to '../web/img/'. The standalone
+// build defines CHAR_IMG (slug -> data URI) which takes precedence for offline use.
+var IMG_BASE = 'img/';
+
+/* Headshot image URL for a character display name ('' if unknown). */
+function imgSrc(name) {
+  const slug = SLUG_BY_NAME[name];
+  if (!slug) return '';
+  if (typeof CHAR_IMG !== 'undefined' && CHAR_IMG[slug]) return CHAR_IMG[slug];
+  return IMG_BASE + slug + '.jpg';
+}
+
 /* Localized character display name; falls back to the canonical name. */
 function cn(name) {
   return lang === 'zh' ? CHAR_ZH[name] ?? name : name;

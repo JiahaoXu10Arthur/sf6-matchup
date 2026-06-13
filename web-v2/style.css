@@ -145,7 +145,13 @@ body {
   flex-wrap: wrap; margin-bottom: var(--space-3);
 }
 
-.hero-id { display: flex; align-items: baseline; gap: 0.7rem; }
+.hero-id { display: flex; align-items: center; gap: 0.8rem; }
+
+/* character headshots (100x46 landscape banner crops from kakuhanapp) */
+.char-avatar {
+  width: 4.6rem; aspect-ratio: 100 / 46; object-fit: cover;
+  border-radius: 7px; border: 1px solid var(--line); background: var(--raised); flex: none;
+}
 
 .view-label {
   font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.16em;
@@ -277,6 +283,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 
 .chip:hover { transform: translateY(-2px); background: #20283c; border-color: var(--chip-color, var(--accent)); }
 
+.chip-avatar { width: 1.8rem; aspect-ratio: 100 / 46; object-fit: cover; border-radius: 3px; flex: none; }
 .chip-name { font-family: var(--font-display); font-weight: 600; letter-spacing: 0.02em; }
 .chip-score { font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; color: var(--chip-color, var(--text)); font-variant-numeric: tabular-nums; }
 .chip-trend { font-family: var(--font-mono); font-size: 0.78rem; }
@@ -297,7 +304,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 
 .lb-head, .lb-row {
   display: grid;
-  grid-template-columns: 2rem 6.2rem 1fr 3.4rem 3.4rem 3.2rem 3.2rem 2.6rem;
+  grid-template-columns: 2rem 8rem 1fr 3.4rem 3.4rem 3.2rem 3.2rem 2.6rem;
   align-items: center; gap: 0.5rem;
   padding: 0.5rem var(--space-3);
 }
@@ -333,7 +340,8 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .lb-medal-2 .lb-rank { color: #CFD6E6; }
 .lb-medal-3 .lb-rank { color: #E0925A; }
 
-.lb-name { font-family: var(--font-display); font-weight: 600; font-size: 0.92rem; letter-spacing: 0.02em; }
+.lb-name { display: flex; align-items: center; gap: 0.45rem; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: 0.92rem; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; }
+.lb-avatar { width: 2rem; aspect-ratio: 100 / 46; object-fit: cover; border-radius: 3px; flex: none; }
 
 /* diverging COVER bar: center line, positive grows right, negative grows left */
 .lb-track {
@@ -361,8 +369,9 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .lb-corr.bad { color: var(--t-dis); }
 
 @media (max-width: 720px) {
-  .lb-head, .lb-row { grid-template-columns: 1.8rem 4.6rem 1fr 3.2rem 3.2rem; gap: 0.4rem; }
+  .lb-head, .lb-row { grid-template-columns: 1.8rem 5.2rem 1fr 3.2rem 3.2rem; gap: 0.4rem; }
   .lb-str, .lb-corr, .lb-shared { display: none; }
+  .lb-avatar { display: none; }
 }
 
 .loading { color: var(--text-dim); font-family: var(--font-display); letter-spacing: 0.06em; }

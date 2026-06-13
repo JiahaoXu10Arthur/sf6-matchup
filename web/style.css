@@ -111,7 +111,15 @@ body {
 
 .alt-link:hover { color: var(--accent); border-color: var(--accent); }
 
-.masthead-char { text-align: right; }
+.masthead-char { display: flex; align-items: center; justify-content: flex-end; gap: 0.7rem; }
+.masthead-char-text { text-align: right; }
+
+/* character headshots (100x46 landscape banner crops from kakuhanapp) */
+.char-avatar {
+  width: 5rem; aspect-ratio: 100 / 46; object-fit: cover;
+  border-radius: 7px; border: 1px solid var(--line);
+  background: var(--surface-2); flex: none;
+}
 
 .char-label {
   display: block;
@@ -441,7 +449,7 @@ body.view-subs { --num-col: 24rem; }
 
 .axis {
   display: grid;
-  grid-template-columns: var(--name-col, 7.5rem) 1fr var(--num-col, 12.6rem);
+  grid-template-columns: var(--name-col, 10rem) 1fr var(--num-col, 12.6rem);
   gap: var(--space-2);
   font-family: var(--font-display);
   font-size: 0.6rem; letter-spacing: 0.12em;
@@ -462,7 +470,7 @@ body.view-subs { --num-col: 24rem; }
 
 .row {
   display: grid;
-  grid-template-columns: var(--name-col, 7.5rem) 1fr var(--num-col, 12.6rem);
+  grid-template-columns: var(--name-col, 10rem) 1fr var(--num-col, 12.6rem);
   gap: var(--space-2);
   align-items: center;
   padding: 0.22rem 0;
@@ -475,6 +483,13 @@ body.view-subs { --num-col: 24rem; }
 .row:hover .name { color: var(--accent); }
 
 .row .name {
+  display: flex; align-items: center; gap: 0.45rem; min-width: 0;
+}
+.row-avatar {
+  width: 2.3rem; aspect-ratio: 100 / 46; object-fit: cover;
+  border-radius: 4px; flex: none; background: var(--surface-2);
+}
+.row .row-name-text {
   font-family: var(--font-display);
   font-size: 0.8rem; font-weight: 600; letter-spacing: 0.03em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -551,6 +566,7 @@ body.view-subs { --num-col: 24rem; }
   :root { --name-col: 6.2rem; }
   body.view-match, body.view-subs { --num-col: 4rem; }
   .col-sub { display: none; }
+  .row-avatar { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

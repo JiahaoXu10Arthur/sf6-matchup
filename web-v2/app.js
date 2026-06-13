@@ -19,6 +19,17 @@ const $ = sel => document.querySelector(sel);
 const DEFAULT_TIER = { 40: 1, 41: 2, 42: 3 };
 const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
 
+IMG_BASE = '../web/img/';   // headshots live under web/; v2 reaches back into it
+
+// set an <img> headshot's src + alt; hide gracefully if missing
+function setAvatar(img, name) {
+  const src = imgSrc(name);
+  img.src = src;
+  img.alt = cn(name);
+  img.style.visibility = src ? '' : 'hidden';
+  img.onerror = () => { img.style.visibility = 'hidden'; };
+}
+
 // official Buckler bands, rendered worst-first (top to bottom)
 const MATCH_TIERS = [
   { lo: -Infinity, hi: 4.7, label: 'tierDis', cls: 't-dis' },
@@ -64,6 +75,7 @@ function applyI18n() {
   document.querySelectorAll('.lang-switch button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
   $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
   $('#char-name').textContent = cn(state.char);
+  setAvatar($('#char-avatar'), state.char);
   document.querySelectorAll('#char-select option').forEach(o => o.textContent = cn(o.value));
   document.querySelectorAll('#exclude-chips .opp-w').forEach(el =>
     el.querySelector('.opp-name').textContent = cn(el.dataset.char));
@@ -223,6 +235,7 @@ function selectChar(c) {
   state.char = c;
   $('#char-select').value = c;
   $('#char-name').textContent = cn(c);
+  setAvatar($('#char-avatar'), c);
   render();
 }
 
@@ -291,6 +304,7 @@ function matchChip(r, metric) {
   const flag = r.spread > 0.25 ? `<span class="chip-flag" title="${t('spreadFlag')}">⚠</span>` : '';
   const title = `High ${fmt(r.t40)} · Grand ${fmt(r.t41)} · Ult ${fmt(r.t42)} · Δ ${sfmt(r.dpatch)} · ${t('chipHint')}`;
   return `<button class="chip ${tierCls}" data-char="${r.opp}" title="${title}">
+    <img class="chip-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.display='none'">
     <span class="chip-name">${cn(r.opp)}</span>
     <span class="chip-score">${fmt(v, 2)}</span>${trend}${flag}
   </button>`;
@@ -335,7 +349,7 @@ function subRow(r, i, cover, maxAbs) {
   const title = `${t('hCover')} ${sfmt(cover)} · ${t('hSpec')} ${sfmt(r.spec)} · ${t('hStr')} ${fmt(r.strength, 3)} · ${t('hCorr')} ${sfmt(r.corr, 2)} · ${t('chipHint')}`;
   return `<button class="lb-row${medal}" data-char="${r.sub}" title="${title}">
     <span class="lb-rank">${i + 1}</span>
-    <span class="lb-name">${cn(r.sub)}</span>
+    <span class="lb-name"><img class="lb-avatar" src="${imgSrc(r.sub)}" alt="" loading="lazy" onerror="this.style.display='none'">${cn(r.sub)}</span>
     <span class="lb-track">
       <span class="lb-fill ${cover >= 0 ? 'pos' : 'neg'} ${divCls(cover)}" style="width:${pct / 2}%"></span>
     </span>

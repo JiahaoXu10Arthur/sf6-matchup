@@ -66,6 +66,7 @@ function applyI18n() {
     b.classList.toggle('active', b.dataset.lang === lang));
   $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
   $('#char-name').textContent = cn(state.char);
+  setAvatar($('#char-avatar'), state.char);
   document.querySelectorAll('#char-select option').forEach(o =>
     o.textContent = cn(o.value));
   document.querySelectorAll('#exclude-chips .opp-w').forEach(el =>
@@ -239,6 +240,7 @@ function selectChar(c) {
   state.char = c;
   $('#char-select').value = c;
   $('#char-name').textContent = cn(c);
+  setAvatar($('#char-avatar'), c);
   render();
 }
 
@@ -341,11 +343,20 @@ function syncRows(keys, makeRow, updateRow, orderOf) {
 function rowSkeleton(cols) {
   const el = document.createElement('div');
   el.className = 'row';
-  el.innerHTML = `<span class="name"></span>
+  el.innerHTML = `<span class="name"><img class="row-avatar" alt="" loading="lazy"><span class="row-name-text"></span></span>
     <div class="bar-track"><div class="bar"></div></div>
     <div class="nums">${cols.map(([w, ty]) =>
       `<span class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}"></span>`).join('')}</div>`;
   return el;
+}
+
+// set a row/header avatar's src + alt; hide gracefully if the image is missing
+function setAvatar(img, name) {
+  const src = imgSrc(name);
+  img.src = src;
+  img.alt = cn(name);
+  img.style.visibility = src ? '' : 'hidden';
+  img.onerror = () => { img.style.visibility = 'hidden'; };
 }
 
 // `sorts[i]` (optional) makes column i a clickable sort control with that key;
@@ -411,7 +422,8 @@ function renderMatchups() {
     (el, opp) => {
       const r = byOpp.get(opp);
       const v = metric(r);
-      el.querySelector('.name').innerHTML =
+      setAvatar(el.querySelector('.row-avatar'), opp);
+      el.querySelector('.row-name-text').innerHTML =
         cn(opp) + (r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '');
       setBar(el, (v - 5.0) / BAR_HALF);
       const [main, d, mo] = el.querySelectorAll('.nums > *');
@@ -463,7 +475,8 @@ function renderSubs() {
     (el, sub) => {
       const r = bySub.get(sub);
       const v = cover(r);
-      el.querySelector('.name').textContent = cn(sub);
+      setAvatar(el.querySelector('.row-avatar'), sub);
+      el.querySelector('.row-name-text').textContent = cn(sub);
       setBar(el, v / COVER_HALF);
       const [main, spec, str, w3, corr, sh] = el.querySelectorAll('.nums > *');
       main.textContent = sfmt(v);
