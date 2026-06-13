@@ -21,6 +21,7 @@ const STRINGS = {
     loadError: 'Could not load ../output/matrix.csv — run build_matrix.py first.',
     reset: 'Reset to defaults',
     tierHint: 'COMB only — pick COMB above',
+    rankComb: 'COMB',
     rank: { 40: 'High', 41: 'Grand', 42: 'Ult' },
     rankFull: { 40: 'High', 41: 'Grand', 42: 'Ultimate' },
     metricComb: 'COMB (tier-weighted)',
@@ -36,6 +37,8 @@ const STRINGS = {
     axisCovers: 'COVERS ►',
     hScore: 'SCORE', hDpatch: 'ΔPATCH', hMo: 'MO',
     hCover: 'COVER', hW3: 'W3%', hCorr: 'CORR', hShared: 'SHARED',
+    kHardest: 'Hardest', kDis: 'Disadvantages', kAdv: 'Advantages', kBest: 'Best',
+    kTopSub: 'Top sub', kCovers: 'Cover weaknesses', kComplement: 'Most complementary',
     spreadFlag: 'tier spread > 0.25',
     moSuffix: 'mo',
     sharedSuffix: ' shared',
@@ -59,9 +62,10 @@ const STRINGS = {
     loading: '正在加载数据…',
     loadError: '无法加载 ../output/matrix.csv — 请先运行 build_matrix.py。',
     reset: '重置为默认',
-    tierHint: '仅综合 — 请在上方选择 COMB',
-    rank: { 40: '高阶', 41: '特级', 42: '究极' },
-    rankFull: { 40: '高阶', 41: '特级', 42: '究极' },
+    tierHint: '仅综合 — 请在上方选择综合',
+    rankComb: '综合',
+    rank: { 40: 'High', 41: 'Grand', 42: 'Ult' },
+    rankFull: { 40: 'High', 41: 'Grand', 42: 'Ultimate' },
     metricComb: '综合（段位加权）',
     headMatch: '<b>{char}</b> 对阵 {n} 名角色 · 按最不利排序 · 指标：<b>{metric}</b> · ⚠ 段位间差异 &gt; 0.25',
     headSubs: '<b>{char}</b> 的副角推荐 · 最难对局前 3：{worst3} · 指标：<b>{metric}</b>',
@@ -74,7 +78,9 @@ const STRINGS = {
     axisZero: '0',
     axisCovers: '补强 ►',
     hScore: '分数', hDpatch: '补丁差', hMo: '月份',
-    hCover: 'COVER', hW3: '前3胜率', hCorr: '相关', hShared: '共弱',
+    hCover: '补强', hW3: '前3胜率', hCorr: '相关', hShared: '共弱',
+    kHardest: '最难对局', kDis: '劣势数', kAdv: '优势数', kBest: '最优对局',
+    kTopSub: '最佳副角', kCovers: '可补强弱点', kComplement: '最互补',
     spreadFlag: '段位间差异 > 0.25',
     moSuffix: '月',
     sharedSuffix: ' 共弱',
@@ -93,6 +99,14 @@ const CHAR_ZH = {
   'TERRY': '特瑞', 'MAI': '舞', 'ELENA': '艾琳娜', 'SAGAT': '沙加特',
   'C.VIPER': '毒蛇', 'ALEX': '亚历克斯', 'INGRID': '英格丽德',
 };
+
+/* In-game character-select roster order (drives the dropdown). */
+const ROSTER_ORDER = [
+  'LUKE', 'JAMIE', 'MANON', 'KIMBERLY', 'MARISA', 'LILY', 'JP', 'JURI',
+  'DEE JAY', 'CAMMY', 'RYU', 'E.HONDA', 'BLANKA', 'GUILE', 'KEN', 'CHUN-LI',
+  'ZANGIEF', 'DHALSIM', 'RASHID', 'A.K.I.', 'ED', 'GOUKI', 'VEGA', 'TERRY',
+  'MAI', 'ELENA', 'SAGAT', 'C.VIPER', 'ALEX', 'INGRID',
+];
 
 let lang = localStorage.getItem('sf6lab-lang')
   || (navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en');

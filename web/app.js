@@ -72,7 +72,9 @@ function exclude() {
 
 function buildCharSelect() {
   const sel = $('#char-select');
-  for (const c of Object.keys(idx).sort()) {
+  const present = new Set(Object.keys(idx));
+  const ordered = ROSTER_ORDER.filter(c => present.has(c));
+  for (const c of [...ordered, ...[...present].filter(c => !ordered.includes(c))]) {
     const o = document.createElement('option');
     o.value = c;
     o.textContent = cn(c);
@@ -264,6 +266,15 @@ function setBar(el, frac) {
   bar.style.transform = `scaleX(${Math.min(Math.abs(frac), 1)})`;
 }
 
+// data-dense dashboard "key indicators" strip — the headline insight at a glance
+function renderKpis(cards) {
+  $('#kpis').innerHTML = cards.map(c =>
+    `<div class="kpi ${c.tone || ''}">
+       <span class="kpi-label">${c.label}</span>
+       <span class="kpi-val">${c.val}${c.sub ? `<small>${c.sub}</small>` : ''}</span>
+     </div>`).join('');
+}
+
 function renderMatchups() {
   const table = charTable(idx, state.char, state.monthW, exclude(),
                           state.tierW, PATCH_MONTH);
@@ -276,6 +287,17 @@ function renderMatchups() {
     char: cn(state.char), n: rows.length,
     metric: state.rank === 'comb' ? t('metricComb') : t('rankFull')[state.rank],
   });
+
+  if (rows.length) {
+    const hardest = rows[0], best = rows[rows.length - 1];
+    renderKpis([
+      { label: t('kHardest'), val: cn(hardest.opp), sub: fmt(metric(hardest)), tone: 'dis' },
+      { label: t('kDis'), val: rows.filter(r => metric(r) < 4.9).length, tone: 'dis' },
+      { label: t('kAdv'), val: rows.filter(r => metric(r) > 5.1).length, tone: 'adv' },
+      { label: t('kBest'), val: cn(best.opp), sub: fmt(metric(best)), tone: 'adv' },
+    ]);
+  }
+
   $('#axis').innerHTML = axisHtml(
     t('axisOpponent'),
     [t('axisLosing'), t('axisEven'), t('axisWinning')],
@@ -309,8 +331,19 @@ function renderSubs() {
   $('#canvas-head').innerHTML = t('headSubs', {
     char: cn(state.char),
     worst3: worst3.map(o => `<b>${cn(o)}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
-    metric: `COVER${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
+    metric: `${t('hCover')}${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
+
+  if (rows.length) {
+    const top = rows[0];
+    const compl = rows.slice().sort((a, b) => a.corr - b.corr)[0];
+    renderKpis([
+      { label: t('kTopSub'), val: cn(top.sub), sub: sfmt(metric(top)), tone: 'adv' },
+      { label: t('kCovers'), val: rows.filter(r => metric(r) > 0).length, tone: 'adv' },
+      { label: t('kComplement'), val: cn(compl.sub), sub: 'r ' + sfmt(compl.corr, 2), tone: 'adv' },
+    ]);
+  }
+
   $('#axis').innerHTML = axisHtml(
     t('axisSub'),
     [t('axisShares'), t('axisZero'), t('axisCovers')],
