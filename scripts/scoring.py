@@ -50,25 +50,54 @@ def wavg(scores, weights):
     return sum(s * w for s, w in pairs) / sum(w for _, w in pairs)
 
 
-def coverage(main_row, sub_row, opp_weights=None):
-    """Sub coverage of main's weaknesses, with optional per-opponent weights.
-
-    COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), where
+def _weakness_weights(main_row, opp_weights=None):
+    """w(O) per opponent for the coverage family:
         w(O) = u(O) * sev(O) + max(0, u(O) - 1) * TARGET_INJECT
         sev(O) = max(0, 5 - main_vs_O) ** 2          # weakness severity
 
-    u(O) is the per-opponent weight (default 1.0): u=1 reproduces the plain
-    weakness-weighted score exactly, u=0 drops the opponent, u>1 targets it
-    (counts even when it is not a current weakness, via TARGET_INJECT).
-    Opponents missing from sub_row count as neutral (5.0)."""
-    sev = {o: max(0.0, 5.0 - ms) ** 2 for o, ms in main_row.items()}
-    num = den = 0.0
-    for opp, s in sev.items():
+    u(O) is the per-opponent weight (default 1.0): u=1 gives the plain
+    weakness-weighted scheme, u=0 drops the opponent, u>1 targets it (counts even
+    when it is not a current weakness, via TARGET_INJECT). Returns only opponents
+    with nonzero weight."""
+    out = {}
+    for opp, ms in main_row.items():
+        sev = max(0.0, 5.0 - ms) ** 2
         u = 1.0 if opp_weights is None else opp_weights.get(opp, 1.0)
-        w = u * s + max(0.0, u - 1.0) * TARGET_INJECT
+        w = u * sev + max(0.0, u - 1.0) * TARGET_INJECT
         if w:
-            num += w * (sub_row.get(opp, 5.0) - 5.0)
-            den += w
+            out[opp] = w
+    return out
+
+
+def strength(row):
+    """Overall mean matchup score of a character's combined row (tier proxy).
+    Empty row -> neutral 5.0."""
+    return fmean(row.values()) if row else 5.0
+
+
+def coverage(main_row, sub_row, opp_weights=None):
+    """Sub coverage of main's weaknesses: weakness-weighted ABSOLUTE edge.
+
+    COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), with w(O) from
+    _weakness_weights(). Opponents missing from sub_row count as neutral (5.0)."""
+    w = _weakness_weights(main_row, opp_weights)
+    num = sum(wt * (sub_row.get(opp, 5.0) - 5.0) for opp, wt in w.items())
+    den = sum(w.values())
+    return num / den if den else 0.0
+
+
+def specialization(main_row, sub_row, opp_weights=None):
+    """Sub coverage measured RELATIVE TO the sub's own average matchup, so a
+    globally-strong character (wins against everyone) nets ~0 and only genuine
+    counters to the main's weaknesses score high. Removes the raw-strength bias
+    in COVER.
+
+    SPEC = sum(w(O) * (sub_vs_O - sub_mean)) / sum(w(O)), same w(O) as coverage.
+    Opponents missing from sub_row count as neutral relative to the sub (sub_mean)."""
+    sub_mean = strength(sub_row)
+    w = _weakness_weights(main_row, opp_weights)
+    num = sum(wt * (sub_row.get(opp, sub_mean) - sub_mean) for opp, wt in w.items())
+    den = sum(w.values())
     return num / den if den else 0.0
 
 

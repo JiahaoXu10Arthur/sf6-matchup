@@ -297,8 +297,8 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 
 .lb-head, .lb-row {
   display: grid;
-  grid-template-columns: 2.2rem 7rem 1fr 3.6rem 3.6rem 3rem 2.8rem;
-  align-items: center; gap: 0.6rem;
+  grid-template-columns: 2rem 6.2rem 1fr 3.4rem 3.4rem 3.2rem 3.2rem 2.6rem;
+  align-items: center; gap: 0.5rem;
   padding: 0.5rem var(--space-3);
 }
 
@@ -308,7 +308,13 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim);
 }
 .lb-head .lb-track-head { text-align: center; }
-.lb-head .lb-cover, .lb-head .lb-corr, .lb-head .lb-w3, .lb-head .lb-shared { text-align: right; }
+.lb-head .lb-cover, .lb-head .lb-spec, .lb-head .lb-str,
+.lb-head .lb-corr, .lb-head .lb-shared { text-align: right; }
+
+/* sortable column headers */
+.lb-sort { cursor: pointer; transition: color var(--dur) var(--ease); }
+.lb-sort:hover { color: var(--text); }
+.lb-sort.active { color: var(--accent); }
 
 .lb-row {
   width: 100%; text-align: left; cursor: pointer;
@@ -343,20 +349,20 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .lb-fill.neg { right: 50%; background: linear-gradient(270deg, rgba(255, 77, 94, 0.35), var(--t-dis)); }
 .lb-fill.t-sadv.pos { background: linear-gradient(90deg, rgba(91, 214, 138, 0.3), var(--t-sadv)); }
 
-.lb-cover, .lb-corr, .lb-w3, .lb-shared {
+.lb-cover, .lb-spec, .lb-str, .lb-corr, .lb-shared {
   font-family: var(--font-mono); font-size: 0.82rem; text-align: right;
   font-variant-numeric: tabular-nums; color: var(--text-dim);
 }
-.lb-cover { font-weight: 700; }
-.lb-cover.t-adv { color: var(--t-adv); }
-.lb-cover.t-sadv { color: var(--t-sadv); }
-.lb-cover.t-dis { color: var(--t-dis); }
+.lb-cover, .lb-spec { font-weight: 700; }
+.lb-cover.t-adv, .lb-spec.t-adv, .lb-str.t-adv { color: var(--t-adv); }
+.lb-cover.t-sadv, .lb-spec.t-sadv { color: var(--t-sadv); }
+.lb-cover.t-dis, .lb-spec.t-dis, .lb-str.t-dis { color: var(--t-dis); }
 .lb-corr.good { color: var(--t-adv); }
 .lb-corr.bad { color: var(--t-dis); }
 
 @media (max-width: 720px) {
-  .lb-head, .lb-row { grid-template-columns: 1.8rem 5rem 1fr 3.2rem 3rem; gap: 0.4rem; }
-  .lb-w3, .lb-shared { display: none; }
+  .lb-head, .lb-row { grid-template-columns: 1.8rem 4.6rem 1fr 3.2rem 3.2rem; gap: 0.4rem; }
+  .lb-str, .lb-corr, .lb-shared { display: none; }
 }
 
 .loading { color: var(--text-dim); font-family: var(--font-display); letter-spacing: 0.06em; }

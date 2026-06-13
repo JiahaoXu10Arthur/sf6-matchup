@@ -3,7 +3,8 @@ from pathlib import Path
 
 from analyze import combined_row, fmt, resolve_weights
 from roster import NAME_BY_SLUG
-from scoring import correlation, coverage, expand_months, shared_weaknesses
+from scoring import (correlation, coverage, expand_months, shared_weaknesses,
+                     specialization, strength)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -41,6 +42,8 @@ def main():
             'sub': sub,
             'cover': coverage(main_row, row),
             'c40': per_tier[40], 'c41': per_tier[41], 'c42': per_tier[42],
+            'spec': specialization(main_row, row),
+            'strength': strength(row),
             'w3win': sum(w3) / len(w3) * 10 if w3 else None,
             'corr': correlation(main_row, row),
             'shared': len(shared_weaknesses(main_row, row)),
@@ -55,16 +58,20 @@ def main():
         + ', '.join(f'{o} ({main_row[o]:.3f})' for o in worst3),
         '',
         'COVER: weakness-weighted edge (higher = better patch for bad matchups). '
+        'SPEC: same edge but relative to the sub\'s own average — a globally strong '
+        'character nets ~0, so high SPEC = a genuine counter, not just a strong pick. '
+        'STR: the sub\'s overall mean matchup (tier proxy). '
         'corr: matchup-profile correlation (negative = complementary). '
         'shared: count of opponents both characters lose to (<4.9). '
         'w3win%: avg win rate vs the worst 3.',
         '',
-        '| Sub | COVER | COVER@HighM | COVER@GrandM | COVER@UltM | w3win% | corr | shared |',
-        '|---|---|---|---|---|---|---|---|',
+        '| Sub | COVER | SPEC | STR | COVER@HighM | COVER@GrandM | COVER@UltM | w3win% | corr | shared |',
+        '|---|---|---|---|---|---|---|---|---|---|',
     ]
     for r in results:
         lines.append(
-            f"| {r['sub']} | **{r['cover']:+.3f}** | {r['c40']:+.3f} "
+            f"| {r['sub']} | **{r['cover']:+.3f}** | {r['spec']:+.3f} "
+            f"| {r['strength']:.3f} | {r['c40']:+.3f} "
             f"| {r['c41']:+.3f} | {r['c42']:+.3f} | {fmt(r['w3win'], 1)} "
             f"| {r['corr']:+.2f} | {r['shared']} |")
     text = '\n'.join(lines) + '\n'

@@ -524,8 +524,13 @@ body.view-subs { --num-col: 16.8rem; }
 .row .nums .col-main { font-size: 0.85rem; }
 .col-main.adv { color: var(--adv); }
 .col-main.dis { color: var(--dis); }
-.col-sub.neg { color: var(--adv); }
-.col-sub.pos { color: var(--dis); }
+.col-sub.neg, .col-sub.adv { color: var(--adv); }
+.col-sub.pos, .col-sub.dis { color: var(--dis); }
+
+/* sortable sub-finder column headers (axis row only) */
+.axis .col-sort { cursor: pointer; transition: color var(--duration-fast, 150ms) ease; }
+.axis .col-sort:hover { color: var(--text); }
+.axis .col-sort.active { color: var(--accent); }
 
 /* per-column fixed widths (match view) */
 .c-score { width: 3.6rem; }
@@ -533,6 +538,8 @@ body.view-subs { --num-col: 16.8rem; }
 .c-mo { width: 3.4rem; }
 /* per-column fixed widths (subs view) */
 .c-cover { width: 3.6rem; }
+.c-spec { width: 3.6rem; }
+.c-str { width: 3.2rem; }
 .c-w3 { width: 3.4rem; }
 .c-corr { width: 3.8rem; }
 .c-shared { width: 4.2rem; }

@@ -25,22 +25,46 @@ function wavg(scores, weights) {
   return den ? num / den : null;
 }
 
-function coverage(mainRow, subRow, oppWeights) {
-  // w(O) = u(O)·sev(O) + max(0, u(O)−1)·TARGET_INJECT,  sev = max(0, 5−main)².
-  // u defaults to 1 (→ plain weakness-weighted score), u=0 drops O, u>1 targets
-  // it. Missing subRow entries count as neutral (5.0).
-  const sev = {};
+// w(O) = u(O)·sev(O) + max(0, u(O)−1)·TARGET_INJECT,  sev = max(0, 5−main)².
+// u defaults to 1 (→ plain weakness-weighted scheme), u=0 drops O, u>1 targets it.
+function weaknessWeights(mainRow, oppWeights) {
+  const w = {};
   for (const [o, ms] of Object.entries(mainRow)) {
-    sev[o] = Math.max(0, 5.0 - ms) ** 2;
+    const sev = Math.max(0, 5.0 - ms) ** 2;
+    const u = oppWeights ? (oppWeights[o] ?? 1) : 1;
+    const wt = u * sev + Math.max(0, u - 1) * TARGET_INJECT;
+    if (wt) w[o] = wt;
   }
+  return w;
+}
+
+// overall mean matchup score of a row (tier proxy); empty -> neutral 5.0
+function strength(row) {
+  const v = Object.values(row);
+  return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 5.0;
+}
+
+function coverage(mainRow, subRow, oppWeights) {
+  // weakness-weighted ABSOLUTE edge. Missing subRow entries count as neutral (5.0).
+  const w = weaknessWeights(mainRow, oppWeights);
   let num = 0, den = 0;
-  for (const [opp, s] of Object.entries(sev)) {
-    const u = oppWeights ? (oppWeights[opp] ?? 1) : 1;
-    const w = u * s + Math.max(0, u - 1) * TARGET_INJECT;
-    if (w) {
-      num += w * ((subRow[opp] ?? 5.0) - 5.0);
-      den += w;
-    }
+  for (const [opp, wt] of Object.entries(w)) {
+    num += wt * ((subRow[opp] ?? 5.0) - 5.0);
+    den += wt;
+  }
+  return den ? num / den : 0.0;
+}
+
+function specialization(mainRow, subRow, oppWeights) {
+  // coverage measured relative to the sub's own average, so a globally-strong
+  // character nets ~0 and only genuine counters score high. Missing subRow
+  // entries count as neutral relative to the sub (subMean).
+  const subMean = strength(subRow);
+  const w = weaknessWeights(mainRow, oppWeights);
+  let num = 0, den = 0;
+  for (const [opp, wt] of Object.entries(w)) {
+    num += wt * ((subRow[opp] ?? subMean) - subMean);
+    den += wt;
   }
   return den ? num / den : 0.0;
 }
@@ -151,6 +175,8 @@ function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
       sub,
       cover: coverage(mainRow, row, oppWeights),
       c40: perTier['40'], c41: perTier['41'], c42: perTier['42'],
+      spec: specialization(mainRow, row, oppWeights),
+      strength: strength(row),
       w3win: w3.length ? w3.reduce((s, v) => s + v, 0) / w3.length * 10 : null,
       corr: correlation(mainRow, row),
       shared: sharedWeaknesses(mainRow, row).length,
@@ -162,8 +188,8 @@ function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
 
 if (typeof module !== 'undefined') {
   module.exports = {
-    PATCH_MONTH, DEFAULT_TIER_WEIGHTS, RANK_NAMES,
-    monthWeights, wavg, coverage, correlation, sharedWeaknesses,
+    PATCH_MONTH, DEFAULT_TIER_WEIGHTS, RANK_NAMES, TARGET_INJECT,
+    monthWeights, wavg, coverage, specialization, strength, correlation, sharedWeaknesses,
     buildIndex, availableMonths, combinedRow, charTable, subTable,
   };
 }

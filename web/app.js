@@ -8,6 +8,7 @@ const state = {
   monthW: {},             // {month: weight 0..1}
   tierW: { 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
+  subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
 };
 
 let idx = null;
@@ -25,7 +26,7 @@ const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1
 // axis header and data rows so fixed widths keep both vertically aligned.
 const COLS = {
   match: [['c-score', 'main'], ['c-dpatch', 'sub'], ['c-mo', 'sub']],
-  subs: [['c-cover', 'main'], ['c-w3', 'sub'], ['c-corr', 'sub'], ['c-shared', 'sub']],
+  subs: [['c-cover', 'main'], ['c-spec', 'sub'], ['c-str', 'sub'], ['c-w3', 'sub'], ['c-corr', 'sub'], ['c-shared', 'sub']],
 };
 
 async function init() {
@@ -271,6 +272,16 @@ function wireControls() {
     if (row && idx[row.dataset.key]) selectChar(row.dataset.key);
   });
 
+  // click a sortable sub-finder column header to re-rank
+  $('#axis').addEventListener('click', e => {
+    const h = e.target.closest('[data-sort]');
+    if (h) { state.subSort = h.dataset.sort; render(); }
+  });
+  $('#axis').addEventListener('keydown', e => {
+    const h = e.target.closest('[data-sort]');
+    if (h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); state.subSort = h.dataset.sort; render(); }
+  });
+
   document.querySelectorAll('.rank-tabs button').forEach(b =>
     b.addEventListener('click', () => {
       state.rank = b.dataset.rank;
@@ -337,11 +348,19 @@ function rowSkeleton(cols) {
   return el;
 }
 
-function axisHtml(leftLabel, barLabels, cols, headers, titles = []) {
+// `sorts[i]` (optional) makes column i a clickable sort control with that key;
+// the active key gets a ▾ marker and .active class.
+function axisHtml(leftLabel, barLabels, cols, headers, titles = [], sorts = []) {
   return `<span>${leftLabel}</span>
     <span class="axis-bar"><span>${barLabels[0]}</span><span>${barLabels[1]}</span><span>${barLabels[2]}</span></span>
-    <div class="nums">${cols.map(([w, ty], i) =>
-      `<span class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}"${titles[i] ? ` title="${titles[i]}"` : ''}>${headers[i]}</span>`).join('')}</div>`;
+    <div class="nums">${cols.map(([w, ty], i) => {
+      const key = sorts[i];
+      const on = key && state.subSort === key;
+      const sortAttrs = key
+        ? ` data-sort="${key}" role="button" tabindex="0" class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w} col-sort${on ? ' active' : ''}"`
+        : ` class="${ty === 'main' ? 'col-main' : 'col-sub'} ${w}"`;
+      return `<span${sortAttrs}${titles[i] ? ` title="${titles[i]}"` : ''}>${headers[i]}${on ? ' ▾' : ''}</span>`;
+    }).join('')}</div>`;
 }
 
 function setBar(el, frac) {
@@ -408,8 +427,10 @@ function renderMatchups() {
 function renderSubs() {
   const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW,
                                                 exclude(), state.tierW, state.oppW);
-  const metric = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
-  const rows = results.slice().sort((a, b) => metric(b) - metric(a));
+  const cover = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
+  const sortVal = r => state.subSort === 'spec' ? r.spec
+    : state.subSort === 'str' ? r.strength : cover(r);
+  const rows = results.slice().sort((a, b) => sortVal(b) - sortVal(a));
   const bySub = new Map(rows.map(r => [r.sub, r]));
 
   $('#canvas-head').innerHTML = t('headSubs', {
@@ -419,11 +440,11 @@ function renderSubs() {
   });
 
   if (rows.length) {
-    const top = rows[0];
+    const top = rows.slice().sort((a, b) => cover(b) - cover(a))[0];
     const compl = rows.slice().sort((a, b) => a.corr - b.corr)[0];
     renderKpis([
-      { label: t('kTopSub'), val: cn(top.sub), sub: sfmt(metric(top)), tone: 'adv' },
-      { label: t('kCovers'), val: rows.filter(r => metric(r) > 0).length, tone: 'adv' },
+      { label: t('kTopSub'), val: cn(top.sub), sub: sfmt(cover(top)), tone: 'adv' },
+      { label: t('kCovers'), val: rows.filter(r => cover(r) > 0).length, tone: 'adv' },
       { label: t('kComplement'), val: cn(compl.sub), sub: 'r ' + sfmt(compl.corr, 2), tone: 'adv' },
     ]);
   }
@@ -431,20 +452,29 @@ function renderSubs() {
   $('#axis').innerHTML = axisHtml(
     t('axisSub'),
     [t('axisShares'), t('axisZero'), t('axisCovers')],
-    COLS.subs, [t('hCover'), t('hW3'), t('hCorr'), t('hShared')],
-    [, , t('corrHint')]);
+    COLS.subs,
+    [t('hCover'), t('hSpec'), t('hStr'), t('hW3'), t('hCorr'), t('hShared')],
+    [`${t('hCover')} · ${t('sortHint')}`, `${t('specHint')} · ${t('sortHint')}`,
+     `${t('strHint')} · ${t('sortHint')}`, , t('corrHint')],
+    ['cover', 'spec', 'str']);
 
   syncRows(rows.map(r => r.sub),
     () => rowSkeleton(COLS.subs),
     (el, sub) => {
       const r = bySub.get(sub);
-      const v = metric(r);
+      const v = cover(r);
       el.querySelector('.name').textContent = cn(sub);
       setBar(el, v / COVER_HALF);
-      const [main, w3, corr, sh] = el.querySelectorAll('.nums > *');
+      const [main, spec, str, w3, corr, sh] = el.querySelectorAll('.nums > *');
       main.textContent = sfmt(v);
       main.classList.toggle('adv', v >= 0);
       main.classList.toggle('dis', v < 0);
+      spec.textContent = sfmt(r.spec);
+      spec.classList.toggle('adv', r.spec >= 0);
+      spec.classList.toggle('dis', r.spec < 0);
+      str.textContent = fmt(r.strength, 2);
+      str.classList.toggle('adv', r.strength >= 5.05);
+      str.classList.toggle('dis', r.strength <= 4.95);
       w3.textContent = fmt(r.w3win, 1) + '%';
       corr.textContent = 'r ' + sfmt(r.corr, 2);
       corr.classList.toggle('neg', r.corr <= -0.1);

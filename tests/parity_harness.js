@@ -22,6 +22,7 @@ const subs = {};
 const st = s.subTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, oppWeights);
 for (const r of st.results) {
   subs[r.sub] = { cover: r.cover, c40: r.c40, c41: r.c41, c42: r.c42,
+                  spec: r.spec, strength: r.strength,
                   w3win: r.w3win, corr: r.corr, shared: r.shared };
 }
 

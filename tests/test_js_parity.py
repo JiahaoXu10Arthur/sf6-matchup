@@ -14,7 +14,8 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 from analyze import char_table, combined_row
 from roster import NAME_BY_SLUG, PATCH_MONTH
-from scoring import correlation, coverage, month_weights, shared_weaknesses
+from scoring import (correlation, coverage, month_weights, shared_weaknesses,
+                     specialization, strength)
 
 MATRIX = ROOT / 'output' / 'matrix.csv'
 # Derive months from the matrix so the Python side matches whatever the JS
@@ -81,6 +82,8 @@ def test_sub_table_matches_python(parity):
             continue
         j = js['subs'][sub]
         assert j['cover'] == pytest.approx(coverage(main_row, row), abs=TOL)
+        assert j['spec'] == pytest.approx(specialization(main_row, row), abs=TOL)
+        assert j['strength'] == pytest.approx(strength(row), abs=TOL)
         for r, key in ((40, 'c40'), (41, 'c41'), (42, 'c42')):
             tier_row = combined_row(sub, MONTHS, mw, exclude, ranks=[r])
             assert j[key] == pytest.approx(coverage(main_row, tier_row), abs=TOL)

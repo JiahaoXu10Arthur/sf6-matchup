@@ -209,6 +209,37 @@ as a stepper per opponent:
   moderate weakness, a fixed amount independent of how bad the main's worst
   matchup happens to be.
 
+**Specialization (SPEC) — strength-adjusted coverage**:
+
+```
+SPEC = Σ w(O) · (sub_vs_O − sub_mean) / Σ w(O)
+where sub_mean = mean of the sub's combined matchup row (its overall "strength")
+```
+
+COVER has a known bias: it rewards globally-strong characters. A character who
+beats the *entire* cast covers *any* main's weaknesses by construction, so COVER
+tends to recommend the same few top-tier subs (JP, RASHID, DHALSIM) for almost
+everyone. An empirical study across all 29 mains
+([docs/findings-sub-bias.md](findings-sub-bias.md)) measured COVER's correlation
+with raw sub strength at r ≈ +0.36.
+
+SPEC removes that bias by centering each sub's row on its own mean: it asks "does
+this sub over-perform *specifically* against your weaknesses, relative to how it
+does against the field?" A uniformly-strong character nets ≈ 0 (it beats your
+weaknesses no more than it beats anyone); a genuine counter scores high. SPEC's
+correlation with raw strength is r ≈ +0.05 (strength-neutral), and it does **not**
+recommend losers — across all mains its top pick wins the worst-3 as often as
+COVER's. The sub table can be sorted by COVER (default) or SPEC, and shows each
+sub's overall strength as the **STR** column for transparency. Note: a
+rarity-inflation correction was investigated and rejected — the most-recommended
+subs are not uniformly low-variance (DHALSIM is the *most* polarized character),
+so there is no clean signature isolating "unfamiliar-matchup" inflation; the
+per-opponent exclude (u = 0) covers that case if a user wants it.
+
+**STR (strength)**: the sub's overall mean matchup score (its `sub_mean` above),
+a tier proxy. High STR = strong against the whole cast; pairing STR with SPEC
+distinguishes "this sub is just strong" from "this sub specifically counters me."
+
 **Complementarity columns**:
 
 - **corr**: Pearson correlation of the main's and sub's full matchup-score

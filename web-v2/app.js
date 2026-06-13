@@ -9,6 +9,7 @@ const state = {
   monthW: {},
   tierW: { 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
+  subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
 };
 
 let idx = null;
@@ -322,40 +323,43 @@ function renderMatch() {
   wireChips();
 }
 
-// one leaderboard row: rank, name, diverging COVER bar, supporting stats.
-// cover > 0 = covers your weaknesses (good); < 0 = shares them (bad).
-function subRow(r, i, metric, maxAbs) {
-  const v = metric(r);
-  const pct = Math.min(100, Math.abs(v) / maxAbs * 100);
-  const pos = v >= 0;
-  const coverCls = v >= 0.15 ? 't-adv' : v >= 0 ? 't-sadv' : 't-dis';
+const strCls = s => s >= 5.05 ? 't-adv' : s <= 4.95 ? 't-dis' : '';
+const divCls = v => v >= 0.15 ? 't-adv' : v >= 0 ? 't-sadv' : 't-dis';
+
+// one leaderboard row: rank, name, diverging COVER bar, then COVER/SPEC/STR + cues.
+// the bar always tracks COVER (covers > 0 / shares < 0), independent of sort key.
+function subRow(r, i, cover, maxAbs) {
+  const pct = Math.min(100, Math.abs(cover) / maxAbs * 100);
   const corrCls = r.corr <= -0.1 ? 'good' : r.corr >= 0.1 ? 'bad' : '';
   const medal = i < 3 ? ` lb-medal-${i + 1}` : '';
-  const title = `${t('hCover')} ${sfmt(v)} · ${t('hCorr')} ${sfmt(r.corr, 2)} · ${t('hW3')} ${fmt(r.w3win, 1)} · ${t('hShared')} ${r.shared} · ${t('chipHint')}`;
+  const title = `${t('hCover')} ${sfmt(cover)} · ${t('hSpec')} ${sfmt(r.spec)} · ${t('hStr')} ${fmt(r.strength, 3)} · ${t('hCorr')} ${sfmt(r.corr, 2)} · ${t('chipHint')}`;
   return `<button class="lb-row${medal}" data-char="${r.sub}" title="${title}">
     <span class="lb-rank">${i + 1}</span>
     <span class="lb-name">${cn(r.sub)}</span>
     <span class="lb-track">
-      <span class="lb-fill ${pos ? 'pos' : 'neg'} ${coverCls}" style="width:${pct / 2}%"></span>
+      <span class="lb-fill ${cover >= 0 ? 'pos' : 'neg'} ${divCls(cover)}" style="width:${pct / 2}%"></span>
     </span>
-    <span class="lb-cover ${coverCls}">${sfmt(v)}</span>
+    <span class="lb-cover ${divCls(cover)}">${sfmt(cover)}</span>
+    <span class="lb-spec ${divCls(r.spec)}">${sfmt(r.spec)}</span>
+    <span class="lb-str ${strCls(r.strength)}">${fmt(r.strength, 2)}</span>
     <span class="lb-corr ${corrCls}">${sfmt(r.corr, 2)}</span>
-    <span class="lb-w3">${fmt(r.w3win, 1)}</span>
     <span class="lb-shared">${r.shared}</span>
   </button>`;
 }
 
 function renderSubs() {
   const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW);
-  const metric = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
-  const ranked = results.filter(r => metric(r) !== null).sort((a, b) => metric(b) - metric(a));
+  const cover = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
+  const sortVal = r => state.subSort === 'spec' ? r.spec
+    : state.subSort === 'str' ? r.strength : cover(r);
+  const ranked = results.filter(r => cover(r) !== null).sort((a, b) => sortVal(b) - sortVal(a));
 
-  const top = ranked[0];
+  const top = ranked.slice().sort((a, b) => cover(b) - cover(a))[0];
   // complement is drawn from the ranked (visible) set so it can't name a
   // character that was filtered out of the leaderboard.
   const compl = ranked.slice().sort((a, b) => a.corr - b.corr)[0];
   $('#hero-summary').innerHTML = (top && compl) ?
-    `<span class="sum adv">${t('kTopSub')}: ${cn(top.sub)} ${sfmt(metric(top))}</span>` +
+    `<span class="sum adv">${t('kTopSub')}: ${cn(top.sub)} ${sfmt(cover(top))}</span>` +
     `<span class="sum even">${t('kComplement')}: ${cn(compl.sub)} r${sfmt(compl.corr, 2)}</span>` : '';
 
   $('#caption').innerHTML = t('headSubs', {
@@ -365,18 +369,32 @@ function renderSubs() {
   });
 
   if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('tierEmpty')}</div>`; return; }
-  const maxAbs = Math.max(0.05, ...ranked.map(r => Math.abs(metric(r))));
+  const maxAbs = Math.max(0.05, ...ranked.map(r => Math.abs(cover(r))));
+  const sortable = (key, label, hint) => {
+    const on = state.subSort === key;
+    return `<span class="lb-${key} lb-sort${on ? ' active' : ''}" data-sort="${key}" role="button" tabindex="0" title="${hint} · ${t('sortHint')}">${label}${on ? ' ▾' : ''}</span>`;
+  };
   const head = `<div class="lb-head">
     <span class="lb-rank">#</span>
     <span class="lb-name">${t('axisSub')}</span>
     <span class="lb-track-head">◄ ${t('hShared')} · ${t('hCover')} ►</span>
-    <span class="lb-cover">${t('hCover')}</span>
+    ${sortable('cover', t('hCover'), t('hCover'))}
+    ${sortable('spec', t('hSpec'), t('specHint'))}
+    ${sortable('str', t('hStr'), t('strHint'))}
     <span class="lb-corr" title="${t('corrHint')}">${t('hCorr')}</span>
-    <span class="lb-w3">${t('hW3')}</span>
     <span class="lb-shared">${t('hShared')}</span>
   </div>`;
-  $('#lanes').innerHTML = `<div class="lb">${head}${ranked.map((r, i) => subRow(r, i, metric, maxAbs)).join('')}</div>`;
+  $('#lanes').innerHTML = `<div class="lb">${head}${ranked.map((r, i) => subRow(r, i, cover(r), maxAbs)).join('')}</div>`;
+  wireSubSort();
   wireChips();
+}
+
+function wireSubSort() {
+  document.querySelectorAll('.lb-sort').forEach(el => {
+    const go = () => { state.subSort = el.dataset.sort; render(); };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
 }
 
 function wireChips() {

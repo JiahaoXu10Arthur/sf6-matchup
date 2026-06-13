@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 from scoring import (month_weights, wavg, coverage, correlation,
-                     shared_weaknesses, expand_months)
+                     shared_weaknesses, expand_months, specialization, strength)
 
 MONTHS = ['202601', '202602', '202603', '202604', '202605']
 
@@ -98,6 +98,28 @@ def test_coverage_target_inject_is_constant_not_worst_matchup():
     sub = {'A': 5.0, 'B': 6.0}           # neutral vs A, +1 vs B
     # target B at u=2: w(A)=1.0 (edge 0), w(B)=(2-1)*0.25=0.25 (edge +1)
     assert coverage(main, sub, {'B': 2.0}) == pytest.approx(0.25 / 1.25)
+
+
+def test_strength_is_mean_of_row():
+    assert strength({'A': 4.0, 'B': 6.0, 'C': 5.0}) == pytest.approx(5.0)
+    assert strength({}) == 5.0
+
+
+def test_specialization_zero_for_globally_flat_strong_sub():
+    # sub that is uniformly +0.3 above 5 against everyone has no specialization:
+    # it beats your weakness no more than it beats anyone else.
+    main = {'A': 4.0, 'B': 4.5, 'C': 5.2}
+    sub = {'A': 5.3, 'B': 5.3, 'C': 5.3}     # flat, mean 5.3
+    assert specialization(main, sub) == pytest.approx(0.0)
+    assert coverage(main, sub) == pytest.approx(0.3)   # but absolute COVER is +0.3
+
+
+def test_specialization_rewards_a_targeted_counter():
+    # sub spikes vs A (the main's worst) but is average elsewhere → positive SPEC
+    main = {'A': 4.0, 'B': 5.0, 'C': 5.0}    # only A is a weakness (sev 1.0)
+    sub = {'A': 6.0, 'B': 5.0, 'C': 5.0}     # mean 5.333; vs A is +0.667 above own mean
+    assert specialization(main, sub) == pytest.approx(6.0 - (16.0 / 3))
+    assert specialization(main, sub) > 0
 
 
 def test_correlation_no_shared_opponents_returns_zero():
