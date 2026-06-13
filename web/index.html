@@ -69,11 +69,10 @@
         <small class="tier-hint" id="tier-hint" data-i18n="tierHint">COMB only — pick COMB above</small>
       </section>
 
-      <section class="control">
-        <label class="check">
-          <input type="checkbox" id="include-ingrid">
-          <span><span data-i18n="includeIngrid">Include INGRID</span> <small data-i18n="ingridNote">(~3 days of data)</small></span>
-        </label>
+      <section class="control" id="exclude-control">
+        <span class="control-label" data-i18n="exclude">Exclude characters</span>
+        <div class="exclude-chips" id="exclude-chips"></div>
+        <small class="exclude-hint" data-i18n="excludeHint">drop low-sample opponents</small>
       </section>
 
       <button class="reset-btn" id="reset-btn" data-i18n="reset">Reset to defaults</button>

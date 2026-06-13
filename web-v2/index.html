@@ -72,11 +72,10 @@
         <div id="tier-sliders"></div>
         <small class="tier-hint" id="tier-hint" data-i18n="tierHint">COMB only — pick COMB above</small>
       </div>
-      <div class="ctl-group ctl-group-end">
-        <label class="check">
-          <input type="checkbox" id="include-ingrid">
-          <span><span data-i18n="includeIngrid">Include INGRID</span> <small data-i18n="ingridNote">(~3 days of data)</small></span>
-        </label>
+      <div class="ctl-group ctl-group-end" id="exclude-control">
+        <span class="control-label" data-i18n="exclude">Exclude characters</span>
+        <div class="exclude-chips" id="exclude-chips"></div>
+        <small class="exclude-hint" data-i18n="excludeHint">drop low-sample opponents</small>
       </div>
     </section>
 

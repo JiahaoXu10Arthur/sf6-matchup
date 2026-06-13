@@ -76,6 +76,21 @@ def test_coverage_missing_sub_data_counts_as_neutral():
     assert coverage(main, sub) == pytest.approx(0.5)
 
 
+def test_coverage_weight_zero_drops_opponent():
+    main = {'A': 4.5, 'B': 4.5}          # equal weaknesses
+    sub = {'A': 6.0, 'B': 4.0}           # +1 vs A, -1 vs B → cancels at default
+    assert coverage(main, sub) == pytest.approx(0.0)
+    assert coverage(main, sub, {'B': 0.0}) == pytest.approx(1.0)   # drop B → only A
+
+
+def test_coverage_weight_targets_non_weakness():
+    main = {'A': 4.5, 'B': 5.2}          # A weakness (sev .25), B favourable (sev 0)
+    sub = {'A': 5.0, 'B': 6.0}           # neutral vs A, strong vs B
+    assert coverage(main, sub) == pytest.approx(0.0)            # default: B ignored
+    # target B at u=3: inject=.25; w(A)=.25 (edge 0), w(B)=2*.25=.5 (edge +1)
+    assert coverage(main, sub, {'B': 3.0}) == pytest.approx(0.5 / 0.75)
+
+
 def test_correlation_no_shared_opponents_returns_zero():
     assert correlation({'x': 4.0}, {'y': 6.0}) == 0.0
 

@@ -3,7 +3,7 @@
    functions match the Python originals. Keep formulas in sync with METHOD.md. */
 
 const PATCH_MONTH = '202603'; // major all-character balance patch, 2026-03-17
-const DEFAULT_TIER_WEIGHTS = { 40: 3, 41: 2, 42: 1 };
+const DEFAULT_TIER_WEIGHTS = { 40: 1, 41: 2, 42: 3 };
 const RANK_NAMES = { 40: 'HighM', 41: 'GrandM', 42: 'UltM' };
 
 function monthWeights(months, profile, patchMonth) {
@@ -24,12 +24,22 @@ function wavg(scores, weights) {
   return den ? num / den : null;
 }
 
-function coverage(mainRow, subRow) {
-  // COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), w(O) = max(0, 5 - main_vs_O)^2
-  // Opponents missing from subRow count as neutral (5.0): no data, no edge.
+function coverage(mainRow, subRow, oppWeights) {
+  // w(O) = u(O)·sev(O) + max(0, u(O)−1)·inject,  sev = max(0, 5−main)²,
+  // inject = max(maxSev, 0.02). u defaults to 1 (→ plain weakness-weighted score),
+  // u=0 drops O, u>1 targets it. Missing subRow entries count as neutral (5.0).
+  const sev = {};
+  let maxSev = 0;
+  for (const [o, ms] of Object.entries(mainRow)) {
+    const v = Math.max(0, 5.0 - ms) ** 2;
+    sev[o] = v;
+    if (v > maxSev) maxSev = v;
+  }
+  const inject = Math.max(maxSev, 0.02);
   let num = 0, den = 0;
-  for (const [opp, ms] of Object.entries(mainRow)) {
-    const w = Math.max(0, 5.0 - ms) ** 2;
+  for (const [opp, s] of Object.entries(sev)) {
+    const u = oppWeights ? (oppWeights[opp] ?? 1) : 1;
+    const w = u * s + Math.max(0, u - 1) * inject;
     if (w) {
       num += w * ((subRow[opp] ?? 5.0) - 5.0);
       den += w;
@@ -128,7 +138,7 @@ function charTable(idx, char, mw, exclude, tierWeights, patchMonth) {
 }
 
 /* mirrors recommend.py main loop; rows sorted by cover descending */
-function subTable(idx, char, mw, exclude, tierWeights) {
+function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
   const mainRow = combinedRow(idx, char, mw, exclude, tierWeights);
   const worst3 = Object.keys(mainRow).sort((a, b) => mainRow[a] - mainRow[b]).slice(0, 3);
   const results = [];
@@ -138,11 +148,11 @@ function subTable(idx, char, mw, exclude, tierWeights) {
     if (!Object.keys(row).length) continue;
     const perTier = {};
     for (const r of Object.keys(tierWeights))
-      perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]));
+      perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]), oppWeights);
     const w3 = worst3.filter(o => o in row).map(o => row[o]);
     results.push({
       sub,
-      cover: coverage(mainRow, row),
+      cover: coverage(mainRow, row, oppWeights),
       c40: perTier['40'], c41: perTier['41'], c42: perTier['42'],
       w3win: w3.length ? w3.reduce((s, v) => s + v, 0) / w3.length * 10 : null,
       corr: correlation(mainRow, row),

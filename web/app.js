@@ -6,8 +6,8 @@ const state = {
   rank: 'comb',           // 'comb' | '40' | '41' | '42'
   preset: 'current',      // 'current' | 'all' | 'custom'
   monthW: {},             // {month: weight 0..1}
-  tierW: { 40: 3, 41: 2, 42: 1 },
-  includeIngrid: false,
+  tierW: { 40: 1, 41: 2, 42: 3 },
+  oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
 };
 
 let idx = null;
@@ -18,7 +18,7 @@ const $ = sel => document.querySelector(sel);
 const BAR_HALF = 0.6;     // matchup bar full deflection at |score - 5| = 0.6
 const COVER_HALF = 0.4;   // sub COVER bar full deflection at |cover| = 0.4
 
-const DEFAULT_TIER = { 40: 3, 41: 2, 42: 1 };
+const DEFAULT_TIER = { 40: 1, 41: 2, 42: 3 };
 
 // numeric column layout per view: [widthClass, 'main'|'sub'] — shared by the
 // axis header and data rows so fixed widths keep both vertically aligned.
@@ -48,6 +48,7 @@ async function init() {
   buildCharSelect();
   buildMonthSliders();
   buildTierSliders();
+  buildOppWeights();
   wireControls();
   render();
 }
@@ -65,10 +66,12 @@ function applyI18n() {
   $('#char-name').textContent = cn(state.char);
   document.querySelectorAll('#char-select option').forEach(o =>
     o.textContent = cn(o.value));
+  document.querySelectorAll('#exclude-chips .opp-w').forEach(el =>
+    el.querySelector('.opp-name').textContent = cn(el.dataset.char));
 }
 
 function exclude() {
-  return state.includeIngrid ? new Set() : new Set(['INGRID']);
+  return new Set(Object.keys(state.oppW).filter(c => state.oppW[c] === 0));
 }
 
 /* ---------- controls ---------- */
@@ -84,6 +87,39 @@ function buildCharSelect() {
     sel.appendChild(o);
   }
   sel.value = state.char;
+}
+
+// per-opponent weight steppers: 0 = exclude, 1 = normal, 2-3 = target
+function buildOppWeights() {
+  const box = $('#exclude-chips');
+  box.textContent = '';
+  const present = new Set(Object.keys(idx));
+  const ordered = ROSTER_ORDER.filter(c => present.has(c));
+  for (const c of [...ordered, ...[...present].filter(c => !ordered.includes(c))]) {
+    const el = document.createElement('div');
+    el.className = 'opp-w';
+    el.dataset.char = c;
+    el.innerHTML = `<button class="opp-step" data-d="-1" aria-label="decrease">−</button>
+      <span class="opp-name">${cn(c)}</span>
+      <span class="opp-val"></span>
+      <button class="opp-step" data-d="1" aria-label="increase">+</button>`;
+    const valEl = el.querySelector('.opp-val');
+    const paint = () => {
+      const w = state.oppW[c] ?? 1;
+      valEl.textContent = w;
+      el.classList.toggle('excluded', w === 0);
+      el.classList.toggle('targeted', w > 1);
+    };
+    el.querySelectorAll('.opp-step').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const w = Math.max(0, Math.min(3, (state.oppW[c] ?? 1) + Number(btn.dataset.d)));
+        if (w === 1) delete state.oppW[c]; else state.oppW[c] = w;
+        paint();
+        render();
+      }));
+    paint();
+    box.appendChild(el);
+  }
 }
 
 function sliderRow(name, value, max, step, onInput) {
@@ -137,7 +173,7 @@ function updateTierState() {
 function resetDefaults() {
   state.rank = 'comb';
   state.tierW = { ...DEFAULT_TIER };
-  state.includeIngrid = false;
+  state.oppW = { INGRID: 0 };
   setPreset('current');
   state.monthW = monthWeights(months, 'current', PATCH_MONTH);
   document.querySelectorAll('.rank-tabs button').forEach(x => {
@@ -145,9 +181,9 @@ function resetDefaults() {
     x.classList.toggle('active', on);
     x.setAttribute('aria-selected', on);
   });
-  $('#include-ingrid').checked = false;
   buildMonthSliders();
   buildTierSliders();
+  buildOppWeights();
   render();
 }
 
@@ -202,11 +238,6 @@ function wireControls() {
       buildMonthSliders();
       render();
     }));
-
-  $('#include-ingrid').addEventListener('change', e => {
-    state.includeIngrid = e.target.checked;
-    render();
-  });
 
   $('#reset-btn').addEventListener('click', resetDefaults);
 }
@@ -326,7 +357,7 @@ function renderMatchups() {
 
 function renderSubs() {
   const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW,
-                                                exclude(), state.tierW);
+                                                exclude(), state.tierW, state.oppW);
   const metric = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
   const rows = results.slice().sort((a, b) => metric(b) - metric(a));
   const bySub = new Map(rows.map(r => [r.sub, r]));

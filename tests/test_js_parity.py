@@ -26,11 +26,12 @@ pytestmark = [
 ]
 
 
-def js_results(profile):
-    out = subprocess.run(
-        ['node', str(ROOT / 'tests' / 'parity_harness.js'), str(MATRIX),
-         'TERRY', profile],
-        capture_output=True, text=True, check=True)
+def js_results(profile, weights=None):
+    args = ['node', str(ROOT / 'tests' / 'parity_harness.js'), str(MATRIX),
+            'TERRY', profile]
+    if weights is not None:
+        args.append(json.dumps(weights))
+    out = subprocess.run(args, capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
 
 
@@ -83,3 +84,21 @@ def test_sub_table_matches_python(parity):
         assert j['shared'] == len(shared_weaknesses(main_row, row))
         checked += 1
     assert checked == len(js['subs']) == 28
+
+
+def test_sub_table_matches_python_with_opponent_weights():
+    mw = month_weights(MONTHS, 'current', PATCH_MONTH)
+    exclude = {'INGRID'}
+    weights = {'CHUN-LI': 2.0, 'KEN': 0.0, 'ALEX': 3.0}   # target, drop, target
+    js = js_results('current', weights)
+    main_row = combined_row('TERRY', MONTHS, mw, exclude)
+    for sub in (n for n in NAME_BY_SLUG.values() if n != 'TERRY' and n not in exclude):
+        row = combined_row(sub, MONTHS, mw, exclude)
+        if not row:
+            continue
+        assert js['subs'][sub]['cover'] == pytest.approx(
+            coverage(main_row, row, weights), abs=TOL)
+        for r, key in ((40, 'c40'), (41, 'c41'), (42, 'c42')):
+            tier_row = combined_row(sub, MONTHS, mw, exclude, ranks=[r])
+            assert js['subs'][sub][key] == pytest.approx(
+                coverage(main_row, tier_row, weights), abs=TOL)

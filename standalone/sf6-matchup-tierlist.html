@@ -208,6 +208,20 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .tier-hint { display: none; font-family: var(--font-display); font-size: 0.64rem; letter-spacing: 0.02em; color: var(--accent); margin-top: var(--space-1); }
 #tier-control.disabled .tier-hint { display: block; }
 
+/* per-opponent weight steppers */
+.exclude-chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 13rem; overflow-y: auto; }
+.exclude-hint { display: block; font-family: var(--font-display); font-size: 0.6rem; letter-spacing: 0.02em; color: var(--text-dim); margin-top: var(--space-1); line-height: 1.4; }
+.opp-w { display: inline-flex; align-items: center; gap: 0.2rem; background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 0.1rem 0.2rem; }
+.opp-w .opp-name { font-family: var(--font-display); font-size: 0.68rem; font-weight: 600; color: var(--text); min-width: 3.4rem; }
+.opp-w .opp-val { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; color: var(--text-dim); min-width: 0.8rem; text-align: center; }
+.opp-step { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1; width: 1.1rem; height: 1.1rem; padding: 0; background: var(--surface); color: var(--text-dim); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+.opp-step:hover { color: var(--text); border-color: var(--accent); }
+.opp-w.excluded { opacity: 0.5; }
+.opp-w.excluded .opp-name { text-decoration: line-through; }
+.opp-w.excluded .opp-val { color: var(--t-dis); }
+.opp-w.targeted { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.opp-w.targeted .opp-val { color: var(--accent); }
+
 /* ---------- caption ---------- */
 
 .caption { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.01em; color: var(--text-dim); margin-bottom: var(--space-2); }
@@ -345,11 +359,10 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
         <div id="tier-sliders"></div>
         <small class="tier-hint" id="tier-hint" data-i18n="tierHint">COMB only — pick COMB above</small>
       </div>
-      <div class="ctl-group ctl-group-end">
-        <label class="check">
-          <input type="checkbox" id="include-ingrid">
-          <span><span data-i18n="includeIngrid">Include INGRID</span> <small data-i18n="ingridNote">(~3 days of data)</small></span>
-        </label>
+      <div class="ctl-group ctl-group-end" id="exclude-control">
+        <span class="control-label" data-i18n="exclude">Exclude characters</span>
+        <div class="exclude-chips" id="exclude-chips"></div>
+        <small class="exclude-hint" data-i18n="excludeHint">drop low-sample opponents</small>
       </div>
     </section>
 
@@ -376,8 +389,8 @@ const STRINGS = {
     combMix: '(COMB mix)',
     presetCurrent: 'current',
     presetAll: 'all',
-    includeIngrid: 'Include INGRID',
-    ingridNote: '(~3 days of data)',
+    exclude: 'Opponent weights',
+    excludeHint: '0 = exclude · 1 = normal · 2–3 = target. Affects the Sub finder ranking.',
     footer: 'Scores are win-rate ÷ 10, centered at 5.0.<br>Data: kakuhanapp.com mirror of official Buckler diagrams.',
     loading: 'Loading matrix…',
     loadError: 'Could not load ../output/matrix.csv — run build_matrix.py first.',
@@ -422,8 +435,8 @@ const STRINGS = {
     combMix: '（综合配比）',
     presetCurrent: '当前版本',
     presetAll: '全部',
-    includeIngrid: '包含 INGRID',
-    ingridNote: '（仅约 3 天数据）',
+    exclude: '对手权重',
+    excludeHint: '0 = 排除 · 1 = 正常 · 2–3 = 针对。影响副角推荐排序。',
     footer: '分数为胜率 ÷ 10，以 5.0 为中心。<br>数据来自 kakuhanapp.com（官方对战相性图镜像）。',
     loading: '正在加载数据…',
     loadError: '无法加载 ../output/matrix.csv — 请先运行 build_matrix.py。',
@@ -505,7 +518,7 @@ function setLang(l) {
    functions match the Python originals. Keep formulas in sync with METHOD.md. */
 
 const PATCH_MONTH = '202603'; // major all-character balance patch, 2026-03-17
-const DEFAULT_TIER_WEIGHTS = { 40: 3, 41: 2, 42: 1 };
+const DEFAULT_TIER_WEIGHTS = { 40: 1, 41: 2, 42: 3 };
 const RANK_NAMES = { 40: 'HighM', 41: 'GrandM', 42: 'UltM' };
 
 function monthWeights(months, profile, patchMonth) {
@@ -526,12 +539,22 @@ function wavg(scores, weights) {
   return den ? num / den : null;
 }
 
-function coverage(mainRow, subRow) {
-  // COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), w(O) = max(0, 5 - main_vs_O)^2
-  // Opponents missing from subRow count as neutral (5.0): no data, no edge.
+function coverage(mainRow, subRow, oppWeights) {
+  // w(O) = u(O)·sev(O) + max(0, u(O)−1)·inject,  sev = max(0, 5−main)²,
+  // inject = max(maxSev, 0.02). u defaults to 1 (→ plain weakness-weighted score),
+  // u=0 drops O, u>1 targets it. Missing subRow entries count as neutral (5.0).
+  const sev = {};
+  let maxSev = 0;
+  for (const [o, ms] of Object.entries(mainRow)) {
+    const v = Math.max(0, 5.0 - ms) ** 2;
+    sev[o] = v;
+    if (v > maxSev) maxSev = v;
+  }
+  const inject = Math.max(maxSev, 0.02);
   let num = 0, den = 0;
-  for (const [opp, ms] of Object.entries(mainRow)) {
-    const w = Math.max(0, 5.0 - ms) ** 2;
+  for (const [opp, s] of Object.entries(sev)) {
+    const u = oppWeights ? (oppWeights[opp] ?? 1) : 1;
+    const w = u * s + Math.max(0, u - 1) * inject;
     if (w) {
       num += w * ((subRow[opp] ?? 5.0) - 5.0);
       den += w;
@@ -630,7 +653,7 @@ function charTable(idx, char, mw, exclude, tierWeights, patchMonth) {
 }
 
 /* mirrors recommend.py main loop; rows sorted by cover descending */
-function subTable(idx, char, mw, exclude, tierWeights) {
+function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
   const mainRow = combinedRow(idx, char, mw, exclude, tierWeights);
   const worst3 = Object.keys(mainRow).sort((a, b) => mainRow[a] - mainRow[b]).slice(0, 3);
   const results = [];
@@ -640,11 +663,11 @@ function subTable(idx, char, mw, exclude, tierWeights) {
     if (!Object.keys(row).length) continue;
     const perTier = {};
     for (const r of Object.keys(tierWeights))
-      perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]));
+      perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]), oppWeights);
     const w3 = worst3.filter(o => o in row).map(o => row[o]);
     results.push({
       sub,
-      cover: coverage(mainRow, row),
+      cover: coverage(mainRow, row, oppWeights),
       c40: perTier['40'], c41: perTier['41'], c42: perTier['42'],
       w3win: w3.length ? w3.reduce((s, v) => s + v, 0) / w3.length * 10 : null,
       corr: correlation(mainRow, row),
@@ -674,15 +697,15 @@ const state = {
   rank: 'comb',
   preset: 'current',
   monthW: {},
-  tierW: { 40: 3, 41: 2, 42: 1 },
-  includeIngrid: false,
+  tierW: { 40: 1, 41: 2, 42: 3 },
+  oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
 };
 
 let idx = null;
 let months = [];
 
 const $ = sel => document.querySelector(sel);
-const DEFAULT_TIER = { 40: 3, 41: 2, 42: 1 };
+const DEFAULT_TIER = { 40: 1, 41: 2, 42: 3 };
 
 // official Buckler bands, rendered worst-first (top to bottom)
 const MATCH_TIERS = [
@@ -724,6 +747,7 @@ async function init() {
   buildCharSelect();
   buildMonthSliders();
   buildTierSliders();
+  buildOppWeights();
   wireControls();
   render();
 }
@@ -736,9 +760,11 @@ function applyI18n() {
   $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
   $('#char-name').textContent = cn(state.char);
   document.querySelectorAll('#char-select option').forEach(o => o.textContent = cn(o.value));
+  document.querySelectorAll('#exclude-chips .opp-w').forEach(el =>
+    el.querySelector('.opp-name').textContent = cn(el.dataset.char));
 }
 
-function exclude() { return state.includeIngrid ? new Set() : new Set(['INGRID']); }
+function exclude() { return new Set(Object.keys(state.oppW).filter(c => state.oppW[c] === 0)); }
 
 /* ---------- controls (shared shape with v1) ---------- */
 
@@ -753,6 +779,39 @@ function buildCharSelect() {
     sel.appendChild(o);
   }
   sel.value = state.char;
+}
+
+// per-opponent weight steppers: 0 = exclude, 1 = normal, 2-3 = target
+function buildOppWeights() {
+  const box = $('#exclude-chips');
+  box.textContent = '';
+  const present = new Set(Object.keys(idx));
+  const ordered = ROSTER_ORDER.filter(c => present.has(c));
+  for (const c of [...ordered, ...[...present].filter(c => !ordered.includes(c))]) {
+    const el = document.createElement('div');
+    el.className = 'opp-w';
+    el.dataset.char = c;
+    el.innerHTML = `<button class="opp-step" data-d="-1" aria-label="decrease">−</button>
+      <span class="opp-name">${cn(c)}</span>
+      <span class="opp-val"></span>
+      <button class="opp-step" data-d="1" aria-label="increase">+</button>`;
+    const valEl = el.querySelector('.opp-val');
+    const paint = () => {
+      const w = state.oppW[c] ?? 1;
+      valEl.textContent = w;
+      el.classList.toggle('excluded', w === 0);
+      el.classList.toggle('targeted', w > 1);
+    };
+    el.querySelectorAll('.opp-step').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const w = Math.max(0, Math.min(3, (state.oppW[c] ?? 1) + Number(btn.dataset.d)));
+        if (w === 1) delete state.oppW[c]; else state.oppW[c] = w;
+        paint();
+        render();
+      }));
+    paint();
+    box.appendChild(el);
+  }
 }
 
 function sliderRow(name, value, max, step, onInput) {
@@ -800,16 +859,16 @@ function setPreset(p) {
 function resetDefaults() {
   state.rank = 'comb';
   state.tierW = { ...DEFAULT_TIER };
-  state.includeIngrid = false;
+  state.oppW = { INGRID: 0 };
   setPreset('current');
   state.monthW = monthWeights(months, 'current', PATCH_MONTH);
   document.querySelectorAll('.rank-tabs button').forEach(x => {
     const on = x.dataset.rank === 'comb';
     x.classList.toggle('active', on); x.setAttribute('aria-selected', on);
   });
-  $('#include-ingrid').checked = false;
   buildMonthSliders();
   buildTierSliders();
+  buildOppWeights();
   render();
 }
 
@@ -855,7 +914,6 @@ function wireControls() {
       buildMonthSliders(); render();
     }));
 
-  $('#include-ingrid').addEventListener('change', e => { state.includeIngrid = e.target.checked; render(); });
   $('#reset-btn').addEventListener('click', resetDefaults);
 }
 
@@ -930,7 +988,7 @@ function subChip(r, metric) {
 }
 
 function renderSubs() {
-  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW);
+  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW);
   const metric = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
 
   const top = results.slice().sort((a, b) => metric(b) - metric(a))[0];

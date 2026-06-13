@@ -4,12 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const s = require(path.join(__dirname, '..', 'web', 'scoring.js'));
 
-const [csvPath, charName, profile] = process.argv.slice(2);
+const [csvPath, charName, profile, weightsJson] = process.argv.slice(2);
 const csv = fs.readFileSync(csvPath, 'utf8');
 const idx = s.buildIndex(csv);
 const months = s.availableMonths(csv);
 const mw = s.monthWeights(months, profile, s.PATCH_MONTH);
 const exclude = new Set(['INGRID']);
+const oppWeights = weightsJson ? JSON.parse(weightsJson) : undefined;
 
 const table = {};
 for (const r of s.charTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, s.PATCH_MONTH)) {
@@ -18,7 +19,7 @@ for (const r of s.charTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, 
 }
 
 const subs = {};
-const st = s.subTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS);
+const st = s.subTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, oppWeights);
 for (const r of st.results) {
   subs[r.sub] = { cover: r.cover, c40: r.c40, c41: r.c41, c42: r.c42,
                   w3win: r.w3win, corr: r.corr, shared: r.shared };

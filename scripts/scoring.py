@@ -44,13 +44,24 @@ def wavg(scores, weights):
     return sum(s * w for s, w in pairs) / sum(w for _, w in pairs)
 
 
-def coverage(main_row, sub_row):
-    """Sub coverage of main's weaknesses.
-    COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), w(O) = max(0, 5 - main_vs_O)^2.
-    Opponents missing from sub_row count as neutral (5.0): no data, no edge."""
+def coverage(main_row, sub_row, opp_weights=None):
+    """Sub coverage of main's weaknesses, with optional per-opponent weights.
+
+    COVER = sum(w(O) * (sub_vs_O - 5)) / sum(w(O)), where
+        w(O) = u(O) * sev(O) + max(0, u(O) - 1) * inject
+        sev(O) = max(0, 5 - main_vs_O) ** 2          # weakness severity
+        inject = max(max sev over O, 0.02)           # one-weakness worth of weight
+
+    u(O) is the per-opponent weight (default 1.0): u=1 reproduces the plain
+    weakness-weighted score exactly, u=0 drops the opponent, u>1 targets it
+    (counts even when it is not a current weakness). Opponents missing from
+    sub_row count as neutral (5.0)."""
+    sev = {o: max(0.0, 5.0 - ms) ** 2 for o, ms in main_row.items()}
+    inject = max(max(sev.values(), default=0.0), 0.02)
     num = den = 0.0
-    for opp, ms in main_row.items():
-        w = max(0.0, 5.0 - ms) ** 2
+    for opp, s in sev.items():
+        u = 1.0 if opp_weights is None else opp_weights.get(opp, 1.0)
+        w = u * s + max(0.0, u - 1.0) * inject
         if w:
             num += w * (sub_row.get(opp, 5.0) - 5.0)
             den += w
