@@ -50,6 +50,9 @@ function applyI18n() {
   document.querySelectorAll('.lang-switch button').forEach(b =>
     b.classList.toggle('active', b.dataset.lang === lang));
   $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
+  $('#char-name').textContent = cn(state.char);
+  document.querySelectorAll('#char-select option').forEach(o =>
+    o.textContent = cn(o.value));
 }
 
 function exclude() {
@@ -62,7 +65,8 @@ function buildCharSelect() {
   const sel = $('#char-select');
   for (const c of Object.keys(idx).sort()) {
     const o = document.createElement('option');
-    o.value = o.textContent = c;
+    o.value = c;
+    o.textContent = cn(c);
     sel.appendChild(o);
   }
   sel.value = state.char;
@@ -138,7 +142,7 @@ function wireControls() {
 
   $('#char-select').addEventListener('change', e => {
     state.char = e.target.value;
-    $('#char-name').textContent = state.char;
+    $('#char-name').textContent = cn(state.char);
     render();
   });
 
@@ -223,7 +227,7 @@ function renderMatchups() {
   const byOpp = new Map(rows.map(r => [r.opp, r]));
 
   $('#canvas-head').innerHTML = t('headMatch', {
-    char: state.char, n: rows.length,
+    char: cn(state.char), n: rows.length,
     metric: state.rank === 'comb' ? t('metricComb') : t('rankFull')[state.rank],
   });
   $('#axis').innerHTML = `<span>${t('axisOpponent')}</span>
@@ -236,7 +240,7 @@ function renderMatchups() {
       const r = byOpp.get(opp);
       const v = metric(r);
       el.querySelector('.name').innerHTML =
-        opp + (r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '');
+        cn(opp) + (r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '');
       setBar(el, (v - 5.0) / BAR_HALF);
       const [main, d, mo] = el.querySelectorAll('.nums > *');
       main.textContent = fmt(v);
@@ -257,8 +261,8 @@ function renderSubs() {
   const bySub = new Map(rows.map(r => [r.sub, r]));
 
   $('#canvas-head').innerHTML = t('headSubs', {
-    char: state.char,
-    worst3: worst3.map(o => `<b>${o}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
+    char: cn(state.char),
+    worst3: worst3.map(o => `<b>${cn(o)}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
     metric: `COVER${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
   $('#axis').innerHTML = `<span>${t('axisSub')}</span>
@@ -270,7 +274,7 @@ function renderSubs() {
     (el, sub) => {
       const r = bySub.get(sub);
       const v = metric(r);
-      el.querySelector('.name').textContent = sub;
+      el.querySelector('.name').textContent = cn(sub);
       setBar(el, v / COVER_HALF);
       const [main, w3, corr, sh] = el.querySelectorAll('.nums > *');
       main.textContent = sfmt(v);

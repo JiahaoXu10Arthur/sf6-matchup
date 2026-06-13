@@ -81,8 +81,26 @@ const STRINGS = {
   },
 };
 
+/* Official SF6 simplified-Chinese character names (Year 3 chars use the
+   common community transliterations). Keys are the matrix's display names. */
+const CHAR_ZH = {
+  'RYU': '隆', 'LUKE': '卢克', 'JAMIE': '杰米', 'CHUN-LI': '春丽',
+  'GUILE': '古烈', 'KIMBERLY': '金佰莉', 'JURI': '韩蛛俐', 'KEN': '肯',
+  'BLANKA': '布兰卡', 'DHALSIM': '达尔西姆', 'E.HONDA': '本田',
+  'DEE JAY': '迪·杰', 'MANON': '曼侬', 'MARISA': '玛丽莎', 'JP': 'JP',
+  'ZANGIEF': '桑吉尔夫', 'LILY': '莉莉', 'CAMMY': '嘉米', 'RASHID': '拉希德',
+  'A.K.I.': '阿鬼', 'ED': '爱德', 'GOUKI': '豪鬼', 'VEGA': '维加',
+  'TERRY': '特瑞', 'MAI': '舞', 'ELENA': '艾琳娜', 'SAGAT': '沙加特',
+  'C.VIPER': 'C.维帕', 'ALEX': '亚历克斯', 'INGRID': '英格丽德',
+};
+
 let lang = localStorage.getItem('sf6lab-lang')
   || (navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en');
+
+/* Localized character display name; falls back to the canonical name. */
+function cn(name) {
+  return lang === 'zh' ? CHAR_ZH[name] ?? name : name;
+}
 
 function t(key, vars) {
   let s = STRINGS[lang][key] ?? STRINGS.en[key] ?? key;
