@@ -17,13 +17,13 @@ OUT = ROOT / 'standalone'
 
 I18N = (WEB / 'i18n.js').read_text()
 SCORING = (WEB / 'scoring.js').read_text()
-APP = (WEB / 'app.js').read_text()
 CSV = (ROOT / 'output' / 'matrix.csv').read_text()
 
 
-def build(index_path, css_path, out_name, alt_href=None):
+def build(index_path, css_path, app_path, out_name, alt_href=None):
     html = index_path.read_text()
     css = css_path.read_text()
+    app = app_path.read_text()
 
     # strip external font links (blocked in CN / unavailable offline)
     html = re.sub(r'[ \t]*<link[^>]*fonts\.(googleapis|gstatic)\.com[^>]*>\n?', '', html)
@@ -44,7 +44,7 @@ def build(index_path, css_path, out_name, alt_href=None):
         f'<script>var MATRIX_CSV = {json.dumps(CSV)};</script>\n'
         f'<script>\n{I18N}\n</script>\n'
         f'<script>\n{SCORING}\n</script>\n'
-        f'<script>\n{APP}\n</script>\n'
+        f'<script>\n{app}\n</script>\n'
     )
     html = html.replace('</body>', bundle + '</body>')
 
@@ -55,9 +55,16 @@ def build(index_path, css_path, out_name, alt_href=None):
 
 
 def main():
-    build(WEB / 'index.html', WEB / 'style.css', 'sf6-matchup-dark.html')
+    # remove stale earlier artifact names if present
+    for stale in ('sf6-matchup-light.html', 'sf6-matchup-dark.html'):
+        p = OUT / stale
+        if p.exists():
+            p.unlink()
+    build(WEB / 'index.html', WEB / 'style.css', WEB / 'app.js',
+          'sf6-matchup-bars.html')
     build(ROOT / 'web-v2' / 'index.html', ROOT / 'web-v2' / 'style.css',
-          'sf6-matchup-light.html', alt_href='sf6-matchup-dark.html')
+          ROOT / 'web-v2' / 'app.js', 'sf6-matchup-tierlist.html',
+          alt_href='sf6-matchup-bars.html')
 
 
 if __name__ == '__main__':

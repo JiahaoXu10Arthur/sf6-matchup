@@ -3,22 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SF6 Matchup Lab — Analytics</title>
-  <meta name="description" content="Street Fighter 6 matchup analytics dashboard, built on Capcom Buckler diagram data.">
+  <title>SF6 Matchup Lab — Tier View</title>
+  <meta name="description" content="Street Fighter 6 matchup tier list and sub-character finder, built on Capcom Buckler diagram data.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">SF6</span>
-      <span class="brand-name">Matchup Lab</span>
+      <span class="brand-name">MATCHUP <em>TIERS</em></span>
       <span class="brand-kicker" data-i18n="kicker">CAPCOM BUCKLER DATA · MASTER+</span>
     </div>
     <div class="topbar-right">
-      <a class="alt-link" href="../web/">◑ dark version</a>
+      <a class="alt-link" href="../web/">↩ bar view</a>
       <div class="lang-switch" role="group" aria-label="Language">
         <button data-lang="en" class="active">EN</button>
         <button data-lang="zh">中</button>
@@ -32,12 +32,10 @@
       <button role="tab" aria-selected="true" data-view="match" class="active" data-i18n="viewMatch">Matchups</button>
       <button role="tab" aria-selected="false" data-view="subs" data-i18n="viewSubs">Sub finder</button>
     </nav>
-
     <label class="char-field">
       <span class="control-label" data-i18n="character">Character</span>
       <select id="char-select"></select>
     </label>
-
     <div class="rank-field">
       <span class="control-label" id="rank-label" data-i18n="rankView">Rank view</span>
       <div class="rank-tabs" role="tablist" aria-labelledby="rank-label">
@@ -50,6 +48,14 @@
   </div>
 
   <main class="board">
+    <section class="hero">
+      <div class="hero-id">
+        <span class="view-label" id="view-label">MATCHUPS</span>
+        <span class="char-name" id="char-name">TERRY</span>
+      </div>
+      <div class="hero-summary" id="hero-summary"></div>
+    </section>
+
     <section class="controls-card">
       <div class="ctl-group">
         <div class="control-head">
@@ -61,13 +67,11 @@
         </div>
         <div id="month-sliders"></div>
       </div>
-
       <div class="ctl-group" id="tier-control">
         <span class="control-label"><span data-i18n="tierWeights">Tier weights</span> <small data-i18n="combMix">(COMB mix)</small></span>
         <div id="tier-sliders"></div>
         <small class="tier-hint" id="tier-hint" data-i18n="tierHint">COMB only — pick COMB above</small>
       </div>
-
       <div class="ctl-group ctl-group-end">
         <label class="check">
           <input type="checkbox" id="include-ingrid">
@@ -76,23 +80,13 @@
       </div>
     </section>
 
-    <div class="board-head">
-      <span class="view-label" id="view-label">MATCHUPS</span>
-      <span class="char-name" id="char-name">TERRY</span>
-    </div>
-
-    <div class="kpis" id="kpis"></div>
-
-    <section class="table-card">
-      <div class="canvas-head" id="canvas-head"></div>
-      <div class="axis" id="axis" aria-hidden="true"></div>
-      <div class="rows" id="rows" aria-live="polite"></div>
-      <p class="loading" id="loading" data-i18n="loading">Loading matrix…</p>
-    </section>
+    <div class="caption" id="caption"></div>
+    <div class="lanes" id="lanes" aria-live="polite"></div>
+    <p class="loading" id="loading" data-i18n="loading">Loading matrix…</p>
   </main>
 
   <script src="../web/i18n.js"></script>
   <script src="../web/scoring.js"></script>
-  <script src="../web/app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
