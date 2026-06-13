@@ -193,6 +193,13 @@ function setPreset(p) {
     b.classList.toggle('active', b.dataset.preset === p));
 }
 
+function selectChar(c) {
+  state.char = c;
+  $('#char-select').value = c;
+  $('#char-name').textContent = cn(c);
+  render();
+}
+
 function wireControls() {
   document.querySelectorAll('.view-switch button').forEach(b =>
     b.addEventListener('click', () => {
@@ -215,10 +222,12 @@ function wireControls() {
       render();
     }));
 
-  $('#char-select').addEventListener('change', e => {
-    state.char = e.target.value;
-    $('#char-name').textContent = cn(state.char);
-    render();
+  $('#char-select').addEventListener('change', e => selectChar(e.target.value));
+
+  // click a row to scout that opponent / sub (drill into their matchups)
+  $('#rows').addEventListener('click', e => {
+    const row = e.target.closest('.row');
+    if (row && idx[row.dataset.key]) selectChar(row.dataset.key);
   });
 
   document.querySelectorAll('.rank-tabs button').forEach(b =>

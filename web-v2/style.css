@@ -138,7 +138,7 @@ body {
 
 /* ---------- board / hero ---------- */
 
-.board { padding: var(--space-3) var(--space-4) var(--space-4); max-width: 1180px; }
+.board { padding: var(--space-3) var(--space-4) var(--space-4); }
 
 .hero {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);

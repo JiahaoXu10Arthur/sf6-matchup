@@ -433,7 +433,9 @@ body.view-subs { --num-col: 16.8rem; }
   transition: background var(--dur) var(--ease);
 }
 
+.row { cursor: pointer; }
 .row:hover { background: oklch(22% 0.03 265 / 0.6); }
+.row:hover .name { color: var(--accent); }
 
 .row .name {
   font-family: var(--font-display);
