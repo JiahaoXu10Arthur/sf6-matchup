@@ -192,6 +192,16 @@ input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; h
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: none; box-shadow: 0 0 8px rgba(110, 139, 255, 0.6); }
 input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: none; }
 
+/* month weights — active-only stepper list + add picker */
+#month-sliders { display: flex; flex-direction: column; gap: 4px; }
+.month-w { display: grid; grid-template-columns: 1.3rem 1fr 2rem 1.3rem; align-items: center; gap: 0.4rem; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 0.2rem 0.4rem; }
+.month-name { font-family: var(--font-display); font-size: 0.78rem; font-weight: 600; color: var(--text); letter-spacing: 0.02em; }
+.month-val { font-family: var(--font-mono); font-size: 0.74rem; font-weight: 700; color: var(--accent); text-align: right; font-variant-numeric: tabular-nums; }
+.month-step { font-family: var(--font-mono); font-size: 0.82rem; line-height: 1; width: 1.3rem; height: 1.3rem; padding: 0; background: var(--surface); color: var(--text-dim); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.month-step:hover { color: var(--text); border-color: var(--accent); }
+.month-add { width: 100%; margin-top: 2px; font-family: var(--font-display); font-size: 0.74rem; font-weight: 600; padding: 0.32rem 0.4rem; background: var(--surface); color: var(--text-dim); border: 1px dashed var(--line); border-radius: 6px; cursor: pointer; }
+.month-add:hover { border-color: var(--accent); color: var(--text); }
+
 .check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; cursor: pointer; }
 .check small { color: var(--text-dim); }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }

@@ -16,6 +16,7 @@ let months = [];
 
 const $ = sel => document.querySelector(sel);
 const DEFAULT_TIER = { 40: 1, 41: 2, 42: 3 };
+const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
 
 // official Buckler bands, rendered worst-first (top to bottom)
 const MATCH_TIERS = [
@@ -129,13 +130,44 @@ function sliderRow(name, value, max, step, onInput) {
   return row;
 }
 
+// Active months only (weight > 0) as compact steppers; zero-weight months are
+// hidden and re-addable via the picker — keeps 16 months from flooding the card.
 function buildMonthSliders() {
   const box = $('#month-sliders');
   box.textContent = '';
-  for (const m of months) {
-    box.appendChild(sliderRow(`${m.slice(0, 4)}.${m.slice(4)}`, state.monthW[m], 1, 0.05, v => {
-      state.monthW[m] = v; setPreset('custom'); render();
-    }));
+  const fmtw = w => String(Math.round(w * 100) / 100);
+  for (const m of months.filter(x => (state.monthW[x] ?? 0) > 0)) {
+    const row = document.createElement('div');
+    row.className = 'month-w';
+    row.dataset.month = m;
+    row.innerHTML = `<button class="month-step" data-d="-1" aria-label="decrease">−</button>
+      <span class="month-name">${m.slice(0, 4)}.${m.slice(4)}</span>
+      <span class="month-val">${fmtw(state.monthW[m])}</span>
+      <button class="month-step" data-d="1" aria-label="increase">+</button>`;
+    row.querySelectorAll('.month-step').forEach(btn =>
+      btn.addEventListener('click', () => {
+        const w = Math.max(0, Math.min(1, (state.monthW[m] ?? 0) + Number(btn.dataset.d) * MONTH_STEP));
+        state.monthW[m] = Math.round(w * 100) / 100;
+        setPreset('custom');
+        buildMonthSliders();
+        render();
+      }));
+    box.appendChild(row);
+  }
+  const inactive = months.filter(m => !((state.monthW[m] ?? 0) > 0));
+  if (inactive.length) {
+    const sel = document.createElement('select');
+    sel.className = 'month-add';
+    sel.innerHTML = `<option value="">${t('addMonth')}</option>` +
+      inactive.map(m => `<option value="${m}">${m.slice(0, 4)}.${m.slice(4)}</option>`).join('');
+    sel.addEventListener('change', () => {
+      if (!sel.value) return;
+      state.monthW[sel.value] = 1;
+      setPreset('custom');
+      buildMonthSliders();
+      render();
+    });
+    box.appendChild(sel);
   }
 }
 
