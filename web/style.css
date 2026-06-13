@@ -136,7 +136,6 @@ body {
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4) var(--space-4);
   position: relative; z-index: 2;
-  max-width: 1280px;
 }
 
 @media (max-width: 880px) {
