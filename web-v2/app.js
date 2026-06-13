@@ -26,13 +26,6 @@ const MATCH_TIERS = [
   { lo: 5.3, hi: Infinity, label: 'tierAdv', cls: 't-adv' },
 ];
 
-// sub-coverage bands (best cover first)
-const SUB_TIERS = [
-  { lo: 0.15, hi: Infinity, label: 'subStrong', cls: 't-adv' },
-  { lo: 0.0, hi: 0.15, label: 'subModerate', cls: 't-sadv' },
-  { lo: -Infinity, hi: 0.0, label: 'subShares', cls: 't-dis' },
-];
-
 const fmt = (v, nd = 3) => v === null || v === undefined ? '—' : v.toFixed(nd);
 const sfmt = (v, nd = 3) => v === null || v === undefined ? '—'
   : (v >= 0 ? '+' : '') + v.toFixed(nd);
@@ -286,22 +279,35 @@ function renderMatch() {
   wireChips();
 }
 
-function subChip(r, metric) {
+// one leaderboard row: rank, name, diverging COVER bar, supporting stats.
+// cover > 0 = covers your weaknesses (good); < 0 = shares them (bad).
+function subRow(r, i, metric, maxAbs) {
   const v = metric(r);
+  const pct = Math.min(100, Math.abs(v) / maxAbs * 100);
+  const pos = v >= 0;
+  const coverCls = v >= 0.15 ? 't-adv' : v >= 0 ? 't-sadv' : 't-dis';
   const corrCls = r.corr <= -0.1 ? 'good' : r.corr >= 0.1 ? 'bad' : '';
-  const title = `w3 ${fmt(r.w3win, 1)}% · corr ${sfmt(r.corr, 2)} · shared ${r.shared} · ${t('chipHint')}`;
-  return `<button class="chip" data-char="${r.sub}" title="${title}">
-    <span class="chip-name">${cn(r.sub)}</span>
-    <span class="chip-score">${sfmt(v, 2)}</span>
-    <span class="chip-corr ${corrCls}">r${sfmt(r.corr, 2)}</span>
+  const medal = i < 3 ? ` lb-medal-${i + 1}` : '';
+  const title = `${t('hCover')} ${sfmt(v)} · ${t('hCorr')} ${sfmt(r.corr, 2)} · ${t('hW3')} ${fmt(r.w3win, 1)} · ${t('hShared')} ${r.shared} · ${t('chipHint')}`;
+  return `<button class="lb-row${medal}" data-char="${r.sub}" title="${title}">
+    <span class="lb-rank">${i + 1}</span>
+    <span class="lb-name">${cn(r.sub)}</span>
+    <span class="lb-track">
+      <span class="lb-fill ${pos ? 'pos' : 'neg'} ${coverCls}" style="width:${pct / 2}%"></span>
+    </span>
+    <span class="lb-cover ${coverCls}">${sfmt(v)}</span>
+    <span class="lb-corr ${corrCls}">${sfmt(r.corr, 2)}</span>
+    <span class="lb-w3">${fmt(r.w3win, 1)}</span>
+    <span class="lb-shared">${r.shared}</span>
   </button>`;
 }
 
 function renderSubs() {
   const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW);
   const metric = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
+  const ranked = results.filter(r => metric(r) !== null).sort((a, b) => metric(b) - metric(a));
 
-  const top = results.slice().sort((a, b) => metric(b) - metric(a))[0];
+  const top = ranked[0];
   const compl = results.slice().sort((a, b) => a.corr - b.corr)[0];
   $('#hero-summary').innerHTML = top ?
     `<span class="sum adv">${t('kTopSub')}: ${cn(top.sub)} ${sfmt(metric(top))}</span>` +
@@ -313,19 +319,25 @@ function renderSubs() {
     metric: `${t('hCover')}${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
 
-  $('#lanes').innerHTML = SUB_TIERS.map(tier => {
-    const inTier = results.filter(r => metric(r) >= tier.lo && metric(r) < tier.hi)
-                          .sort((a, b) => metric(b) - metric(a));
-    return laneHtml(tier, inTier.map(r => subChip(r, metric)));
-  }).join('');
-
+  if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('tierEmpty')}</div>`; return; }
+  const maxAbs = Math.max(0.05, ...ranked.map(r => Math.abs(metric(r))));
+  const head = `<div class="lb-head">
+    <span class="lb-rank">#</span>
+    <span class="lb-name">${t('axisSub')}</span>
+    <span class="lb-track-head">◄ ${t('hShared')} · ${t('hCover')} ►</span>
+    <span class="lb-cover">${t('hCover')}</span>
+    <span class="lb-corr">${t('hCorr')}</span>
+    <span class="lb-w3">${t('hW3')}</span>
+    <span class="lb-shared">${t('hShared')}</span>
+  </div>`;
+  $('#lanes').innerHTML = `<div class="lb">${head}${ranked.map((r, i) => subRow(r, i, metric, maxAbs)).join('')}</div>`;
   wireChips();
 }
 
 function wireChips() {
-  document.querySelectorAll('.chip[data-char]').forEach(chip =>
-    chip.addEventListener('click', () => {
-      const c = chip.dataset.char;
+  document.querySelectorAll('#lanes [data-char]').forEach(el =>
+    el.addEventListener('click', () => {
+      const c = el.dataset.char;
       if (idx[c]) selectChar(c);   // drill into that character's matchups
     }));
 }

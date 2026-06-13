@@ -17,7 +17,14 @@ from roster import NAME_BY_SLUG, PATCH_MONTH
 from scoring import correlation, coverage, month_weights, shared_weaknesses
 
 MATRIX = ROOT / 'output' / 'matrix.csv'
-MONTHS = ['202601', '202602', '202603', '202604', '202605']
+# Derive months from the matrix so the Python side matches whatever the JS
+# harness reads (it calls availableMonths on the same CSV). Hardcoding drifts
+# whenever the matrix is rebuilt over a different range.
+def _matrix_months():
+    import csv
+    with MATRIX.open() as f:
+        return sorted({r['month'] for r in csv.DictReader(f)})
+MONTHS = _matrix_months() if MATRIX.exists() else []
 TOL = 1e-9
 
 pytestmark = [
