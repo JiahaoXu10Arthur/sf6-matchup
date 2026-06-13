@@ -72,25 +72,80 @@ sf6-matchup/
 
 ## Data source and methodology
 
+### Score scale
+
 Scores follow the Buckler convention of win-rate ÷ 10, centred at 5.0
 (e.g. `5.237` = 52.37 % win rate). Favourability bands: ≥ 5.3 advantageous,
 ≥ 5.1 slightly favourable, ≥ 4.9 even, ≥ 4.7 slightly unfavourable, < 4.7
 disadvantageous.
 
-The complementary-sub score is:
+### Calculation pipeline
+
+Notation: `s(O, r, m)` is the raw score against opponent `O` at rank `r`
+(40 = High, 41 = Grand, 42 = Ultimate Master) in month `m`.
+
+**1. Acquisition & parsing.** One page is fetched per (character, rank, month)
+and cached. Each page is parsed into `{opponent: score}`; the page's own
+embedded month/rank/character is verified to reject server-fallback pages.
+Pre-release character/month combinations return HTTP 500 and are stored as
+empty markers.
+
+**2. Long matrix + integrity check.** All pages are flattened into
+`output/matrix.csv` with rows `(month, rank, char, opp, score)`. An
+**anti-symmetry check** validates that `s(A,B) + s(B,A) ≈ 10` across all mirror
+pairs; the pass criterion is **median deviation < 0.05** (the maximum can be
+larger — the Buckler diagrams are computed per main-character population, so the
+two directions come from different samples).
+
+**3. Month aggregation.** For each opponent and rank, a weighted mean over the
+selected months (months with weight 0 are excluded):
+
+```text
+m̄(O, r) = Σ_m  w_m · s(O, r, m)  /  Σ_m  w_m
+```
+
+Month-weight profiles (`w_m`):
+
+| Profile | Weights |
+|---------|---------|
+| `current` | pre-patch months = 0, patch month (2026-03) = 0.5, post-patch = 1 |
+| `all` | every month = 1 |
+| custom (`--weights`) | user-supplied per-month values |
+
+**4. Tier combination → COMB.** The per-rank means are combined across whichever
+tiers have data, using population weights `W = {High: 3, Grand: 2, Ult: 1}`:
+
+```text
+COMB(O) = Σ_r  W_r · m̄(O, r)  /  Σ_r  W_r
+```
+
+High Master carries the most weight (largest, least-noisy population), Ultimate
+the least. A single-rank view (`--profile` on a chosen rank) simply uses
+`m̄(O, r)` directly. A per-opponent **Δpatch** drift = (Grand Master post-patch
+mean − pre-patch mean) is reported separately.
+
+### Complementary sub-character recommendation
+
+The main character's COMB vector defines its weaknesses. Each candidate sub is
+scored by **coverage**:
 
 ```text
 COVER = Σ w(O) · (sub_vs_O − 5) / Σ w(O),   where  w(O) = max(0, 5 − main_vs_O)²
 ```
 
-Only the main character's losing matchups contribute, weighted by the square of
-their severity, so a sub that patches your hardest matchups outranks one that
-marginally improves many near-even ones. Pearson correlation, shared-weakness
-count, and average win rate versus your worst three opponents are reported as
-complementarity cross-checks.
+Only the main character's losing matchups contribute, weighted by the **square**
+of their severity, so a sub that patches your hardest matchups outranks one that
+marginally improves many near-even ones. Opponents missing from the sub's data
+are treated as neutral (5.0). Three complementarity cross-checks accompany the
+score:
 
-Full methodology — tier weighting rationale, the 2026-03-17 balance patch, the
-anti-symmetry validation, and known limitations — is documented in
+- **corr** — Pearson correlation between the sub's and main's full matchup
+  vectors; negative means the sub wins where the main loses (genuinely complementary).
+- **shared** — number of opponents both characters lose to (score < 4.9).
+- **w3win%** — the sub's average win rate against the main's three worst matchups.
+
+Full methodology — tier weighting rationale, the 2026-03-17 balance patch,
+edge-case handling, and known limitations — is documented in
 [`docs/METHOD.md`](docs/METHOD.md).
 
 ## Pipeline (CLI)
