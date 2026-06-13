@@ -41,7 +41,7 @@
 
 1. `pytest tests/ -v` — all green.
 2. `build_matrix.py` anti-symmetry check: **median** deviation < 0.05 across all paired (month, rank) cells. (Max deviation is NOT a criterion: verified against raw HTML that the source itself is asymmetric — Buckler diagrams are computed per main-character player population, so A-vs-B from A's page ≠ 10 − B-vs-A from B's page exactly; partial-data run showed median 0.028, p90 0.08, max 0.227 with the worst pairs on low-population characters like INGRID. Pair deviations > 0.2 are printed for awareness.)
-3. `output/TERRY_current.md`, `output/TERRY_all.md`, `output/TERRY_subs_current.md`, `output/TERRY_subs_all.md` exist with ≥ 28 opponent rows each.
+3. `output/TERRY_202601-202605_{current,all}.md` and `output/TERRY_subs_202601-202605_{current,all}.md` exist with ≥ 28 opponent rows each (filenames carry the month scope to prevent silent clobbering between runs).
 4. Reproducibility spot-check: `analyze.py --char KEN ...` produces a KEN table with zero code changes.
 
 ## File structure
@@ -627,6 +627,8 @@ def main():
     months = expand_months(args.months)
     mw, label = resolve_weights(args, months)
     rows = char_table(args.char, months, mw, set(args.exclude))
+    if not rows:
+        ap.error(f'no data for character {args.char!r} — check spelling and month range')
 
     lines = [
         f'# {args.char} matchups — months {months[0]}–{months[-1]}, '
@@ -641,7 +643,7 @@ def main():
             f'| {opp} | {fmt(t40)} | {fmt(t41)} | {fmt(t42)} | **{comb:.3f}**'
             f'{noisy} | {spread:.3f} | {fmt(dpatch, 3)} | {nm}/{len(months)} |')
     text = '\n'.join(lines) + '\n'
-    out = ROOT / 'output' / f'{args.char}_{label}.md'
+    out = ROOT / 'output' / f'{args.char}_{months[0]}-{months[-1]}_{label}.md'
     out.write_text(text)
     print(text)
     print(f'-> {out}')
@@ -752,7 +754,7 @@ def main():
             f"| {r['c41']:+.3f} | {r['c42']:+.3f} | {fmt(r['w3win'], 1)} "
             f"| {r['corr']:+.2f} | {r['shared']} |")
     text = '\n'.join(lines) + '\n'
-    out = ROOT / 'output' / f'{args.char}_subs_{label}.md'
+    out = ROOT / 'output' / f'{args.char}_subs_{months[0]}-{months[-1]}_{label}.md'
     out.write_text(text)
     print(text)
     print(f'-> {out}')
