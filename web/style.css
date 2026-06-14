@@ -567,13 +567,13 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
 .char-card .cc-stat-val { font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: var(--text); }
 .char-card .cc-stat-val.adv { color: var(--t-adv); }
 .char-card .cc-stat-val.dis { color: var(--t-dis); }
-.char-card .cc-mlist { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.char-card .cc-mhead { font-family: var(--font-display); font-size: 0.56rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; min-width: 4.2rem; }
+.char-card .cc-mlist { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; align-items: stretch; }
+.char-card .cc-mhead { grid-column: 1 / -1; font-family: var(--font-display); font-size: 0.56rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .char-card .cc-mhead.adv { color: var(--t-adv); }
 .char-card .cc-mhead.dis { color: var(--t-dis); }
-.char-card .cc-mini { display: inline-flex; align-items: center; gap: 0.25rem; background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 0.1rem 0.3rem; }
-.char-card .cc-mini img { width: 1.2rem; aspect-ratio: 100/46; object-fit: cover; border-radius: 3px; }
-.char-card .cc-mini b { font-family: var(--font-display); font-size: 0.6rem; font-weight: 600; color: var(--text); }
-.char-card .cc-mini i { font-family: var(--font-mono); font-size: 0.62rem; font-style: normal; color: var(--text-dim); }
+.char-card .cc-mini { display: flex; align-items: center; gap: 0.25rem; min-width: 0; background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 0.18rem 0.35rem; }
+.char-card .cc-mini img { width: 1.2rem; aspect-ratio: 100/46; object-fit: cover; border-radius: 3px; flex: none; }
+.char-card .cc-mini b { font-family: var(--font-display); font-size: 0.6rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.char-card .cc-mini i { font-family: var(--font-mono); font-size: 0.62rem; font-style: normal; color: var(--text-dim); margin-left: auto; flex: none; }
 .char-card .cc-go { margin-top: 0.1rem; font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); background: rgba(110,139,255,0.12); border: 1px solid rgba(110,139,255,0.4); border-radius: 6px; padding: 0.4rem; cursor: pointer; transition: background var(--dur) var(--ease); }
 .char-card .cc-go:hover { background: rgba(110,139,255,0.22); }
