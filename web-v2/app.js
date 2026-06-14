@@ -7,7 +7,7 @@ const state = {
   rank: 'comb',
   preset: 'current',
   monthW: {},
-  tierW: { 40: 1, 41: 2, 42: 3 },
+  tierW: { 36: 0.5, 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
 };
@@ -16,7 +16,7 @@ let idx = null;
 let months = [];
 
 const $ = sel => document.querySelector(sel);
-const DEFAULT_TIER = { 40: 1, 41: 2, 42: 3 };
+const DEFAULT_TIER = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
 const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
 
 IMG_BASE = '../web/img/';   // headshots live under web/; v2 reaches back into it
@@ -198,8 +198,8 @@ function buildMonthSliders() {
 function buildTierSliders() {
   const box = $('#tier-sliders');
   box.textContent = '';
-  for (const r of ['40', '41', '42']) {
-    box.appendChild(sliderRow(t('rankFull')[r], state.tierW[r], 5, 0.5, v => { state.tierW[r] = v; render(); }));
+  for (const r of ['36', '40', '41', '42']) {
+    box.appendChild(sliderRow(t('rankFull')[r], state.tierW[r], 5, 0.05, v => { state.tierW[r] = v; render(); }));
   }
 }
 

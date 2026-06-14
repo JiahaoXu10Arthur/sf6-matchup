@@ -20,7 +20,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--months', nargs='+', required=True,
                     help='e.g. 202601-202605 or explicit months')
-    ap.add_argument('--ranks', nargs='+', type=int, default=[40, 41, 42])
+    ap.add_argument('--ranks', nargs='+', type=int, default=[36, 40, 41, 42])
     ap.add_argument('--chars', nargs='+', default=sorted(NAME_BY_SLUG))
     args = ap.parse_args()
     from scoring import expand_months

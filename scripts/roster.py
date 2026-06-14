@@ -9,6 +9,9 @@ NAME_BY_SLUG = {
     'alex': 'ALEX', 'ingrid': 'INGRID', 'terry': 'TERRY',
 }
 SLUG_BY_NAME = {v: k for k, v in NAME_BY_SLUG.items()}
-RANKS = {40: 'HighM', 41: 'GrandM', 42: 'UltM'}
-TIER_WEIGHTS = {40: 1, 41: 2, 42: 3}  # weight higher ranks more (closer to true matchup value)
+RANKS = {36: 'Master', 40: 'HighM', 41: 'GrandM', 42: 'UltM'}
+# skill-depth weighting: higher rank = deeper understanding = closer to true
+# matchup value, so weight it more. Master (entry tier, lowest skill) gets the
+# lightest default; all are user-adjustable (continuous) in the web app.
+TIER_WEIGHTS = {36: 0.5, 40: 1, 41: 2, 42: 3}
 PATCH_MONTH = '202603'  # major all-character balance patch landed 2026-03-17

@@ -67,8 +67,9 @@ def char_table(char, months, mw, exclude):
         post = [v for m, v in g.items() if m > PATCH_MONTH]
         dpatch = (sum(post) / len(post) - sum(pre) / len(pre)) if pre and post else None
         nmonths = len({m for r in byrank.values() for m in r})
-        rows.append((opp, tier[40], tier[41], tier[42], comb, spread, dpatch, nmonths))
-    rows.sort(key=lambda r: r[4])
+        rows.append((opp, tier.get(36), tier[40], tier[41], tier[42],
+                     comb, spread, dpatch, nmonths))
+    rows.sort(key=lambda r: r[5])
     return rows
 
 
@@ -90,17 +91,18 @@ def main():
     if not rows:
         ap.error(f'no data for character {args.char!r} — check spelling and month range')
 
+    wlabel = ':'.join(str(TIER_WEIGHTS[r]) for r in (36, 40, 41, 42))
     lines = [
         f'# {args.char} matchups — months {months[0]}–{months[-1]}, '
-        f'profile={label}, tiers 3:2:1 (HighM:GrandM:UltM)',
+        f'profile={label}, tiers {wlabel} (Master:HighM:GrandM:UltM)',
         '',
-        '| Opponent | HighM | GrandM | UltM | COMB | spread | Δpatch | months |',
-        '|---|---|---|---|---|---|---|---|',
+        '| Opponent | Master | HighM | GrandM | UltM | COMB | spread | Δpatch | months |',
+        '|---|---|---|---|---|---|---|---|---|',
     ]
-    for opp, t40, t41, t42, comb, spread, dpatch, nm in rows:
+    for opp, t36, t40, t41, t42, comb, spread, dpatch, nm in rows:
         noisy = ' ⚠' if spread > 0.25 else ''
         lines.append(
-            f'| {opp} | {fmt(t40)} | {fmt(t41)} | {fmt(t42)} | **{comb:.3f}**'
+            f'| {opp} | {fmt(t36)} | {fmt(t40)} | {fmt(t41)} | {fmt(t42)} | **{comb:.3f}**'
             f'{noisy} | {spread:.3f} | {fmt(dpatch, 3)} | {nm}/{len(months)} |')
     text = '\n'.join(lines) + '\n'
     out = ROOT / 'output' / f'{args.char}_{months[0]}-{months[-1]}_{label}.md'

@@ -53,15 +53,18 @@ Each character's page lists 29 opponents (every other character).
 ## 3. Rank tiers and skill-depth weights
 
 kakuhanapp provides matchup data for four ranks: 36 (Master), 40 (High Master),
-41 (Grand Master), and 42 (Ultimate Master). This pipeline uses the three
-highest tiers — 40, 41, 42 — combined with weights **1 : 2 : 3**
-(HighM : GrandM : UltM), i.e. **Ultimate Master is weighted most**.
+41 (Grand Master), and 42 (Ultimate Master). This pipeline uses **all four**,
+combined with default weights **0.5 : 1 : 2 : 3** (Master : HighM : GrandM : UltM),
+i.e. **Ultimate Master is weighted most and Master least**. All four weights are
+continuously adjustable in the web app (tier-weight sliders).
 
 The rationale is *skill depth*, not sample size: the higher the rank, the deeper
 the players' understanding of the game, and the closer their matchup outcomes
 sit to the matchup's "true" character-vs-character value rather than to
 execution errors or gaps in matchup knowledge. Weighting Ultimate Master highest
-therefore privileges the most informed signal.
+therefore privileges the most informed signal; Master (the entry bracket, largest
+population but lowest skill of the four) gets the lightest default weight — it
+adds breadth without dominating the combined score.
 
 This is a deliberate **bias/variance trade-off, made in favor of bias**. The
 trade is real and runs against pure variance-minimization: Ultimate Master has
@@ -95,7 +98,7 @@ kakuhanapp returns HTTP 500 for (character, month) combinations that predate a
 character's release. The downloader treats persistent HTTP errors as
 no-data events and writes empty marker files, keeping re-runs idempotent. Over
 the full 16-month archive 136 such empty files exist — DLC characters before
-their release month, across the three ranks (e.g. INGRID, ALEX, C.VIPER, ELENA,
+their release month, across the four ranks (e.g. INGRID, ALEX, C.VIPER, ELENA,
 SAGAT in the months preceding each one's launch). The matrix builder skips them
 and reports each skip.
 
@@ -132,9 +135,9 @@ patch; a negative value means it improved.
 
 For each (character, opponent) pair, the pipeline computes:
 
-1. **Per-rank monthly average**: for each of the three tiers, a weighted
+1. **Per-rank monthly average**: for each of the four tiers, a weighted
    average over the requested months using the active weight profile.
-2. **Tier-combined score**: the 1:2:3 weighted average over whichever tiers
+2. **Tier-combined score**: the 0.5:1:2:3 weighted average over whichever tiers
    have a non-null monthly average. If a tier has no data for the requested
    months it is simply omitted from the denominator rather than contributing
    zero.
@@ -290,7 +293,7 @@ rather than any single tier's perspective.
 
 - **No sample sizes.** The 件 figures visible on kakuhanapp pages are
   forum-post counts, not match counts. No sample-size or inverse-variance
-  weighting is possible; the 1:2:3 tier weighting is a deliberate skill-depth
+  weighting is possible; the 0.5:1:2:3 tier weighting is a deliberate skill-depth
   choice (§3), not a data-volume estimate.
 - **INGRID data is minimal.** INGRID was released on 2026-05-27. The 202605
   matchup data covers only a few days of matches and is highly unstable. INGRID
@@ -300,7 +303,7 @@ rather than any single tier's perspective.
   roughly in half. The `current` profile assigns it weight 0.5 as a compromise;
   no intra-month separation is available from the data source.
 - **Ultimate Master noise.** UltM has the smallest player population and
-  therefore the highest variance, yet the 1:2:3 scheme weights it *most* (§3) —
+  therefore the highest variance, yet the 0.5:1:2:3 scheme weights it *most* (§3) —
   a deliberate bias toward the most skilled population at the cost of higher
   variance. Outlier scores at UltM are correspondingly amplified; the spread
   warning (§6.3) flags matchups where the tiers disagree enough for this to

@@ -40,8 +40,8 @@ Two interchangeable front-end designs share the same data and logic:
 ## Features
 
 - **Any character, any time range** — `--char`, `--months 202502-202605` (cross-year supported).
-- **All three rank tiers** — High / Grand / Ultimate Master, viewable individually or
-  combined with a 1 : 2 : 3 skill-depth weighting (Ultimate weighted most; see [methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)).
+- **All four rank brackets** — Master / High / Grand / Ultimate Master, viewable individually or
+  combined with a default 0.5 : 1 : 2 : 3 skill-depth weighting (Ultimate weighted most, Master least; continuously adjustable — see [methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)).
 - **Patch-aware month weighting** — `current` (post-patch) and `all` (equal) presets, or
   fully custom per-month weights; the same `{month: weight}` dictionary drives the
   interactive sliders.
@@ -113,16 +113,18 @@ Month-weight profiles (`w_m`):
 | custom (`--weights`) | user-supplied per-month values |
 
 **4. Tier combination → COMB.** The per-rank means are combined across whichever
-tiers have data, using skill-depth weights `W = {High: 1, Grand: 2, Ult: 3}`:
+tiers have data, using default skill-depth weights `W = {Master: 0.5, High: 1, Grand: 2, Ult: 3}`
+(continuously adjustable in the web app):
 
 ```text
 COMB(O) = Σ_r  W_r · m̄(O, r)  /  Σ_r  W_r
 ```
 
 Ultimate Master carries the most weight: higher rank = deeper game understanding,
-so its matchup reads sit closest to the matchup's true value. This is a
-deliberate bias-over-variance choice — Ultimate is the *noisiest* tier (smallest
-population) but the most informed — explained in
+so its matchup reads sit closest to the matchup's true value; Master (entry
+bracket) gets the lightest default. This is a deliberate bias-over-variance
+choice — Ultimate is the *noisiest* tier (smallest population) but the most
+informed — explained in
 [the methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights). A
 single-rank view (`--profile` on a chosen rank) simply uses `m̄(O, r)` directly.
 A per-opponent **Δpatch** drift = (Grand Master post-patch mean − pre-patch

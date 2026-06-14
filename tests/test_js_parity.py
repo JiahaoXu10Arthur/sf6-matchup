@@ -55,10 +55,10 @@ def test_char_table_matches_python(parity):
     py = {r[0]: r for r in char_table('TERRY', MONTHS, mw, {'INGRID'})}
     assert set(js['table']) == set(py)
     for opp, j in js['table'].items():
-        opp_, t40, t41, t42, comb, spread, dpatch, nmonths = py[opp]
+        opp_, t36, t40, t41, t42, comb, spread, dpatch, nmonths = py[opp]
         assert j['comb'] == pytest.approx(comb, abs=TOL)
-        for jv, pv in ((j['t40'], t40), (j['t41'], t41), (j['t42'], t42),
-                       (j['dpatch'], dpatch)):
+        for jv, pv in ((j['t36'], t36), (j['t40'], t40), (j['t41'], t41),
+                       (j['t42'], t42), (j['dpatch'], dpatch)):
             assert (jv is None) == (pv is None)
             if pv is not None:
                 assert jv == pytest.approx(pv, abs=TOL)
@@ -84,7 +84,7 @@ def test_sub_table_matches_python(parity):
         assert j['cover'] == pytest.approx(coverage(main_row, row), abs=TOL)
         assert j['spec'] == pytest.approx(specialization(main_row, row), abs=TOL)
         assert j['strength'] == pytest.approx(strength(row), abs=TOL)
-        for r, key in ((40, 'c40'), (41, 'c41'), (42, 'c42')):
+        for r, key in ((36, 'c36'), (40, 'c40'), (41, 'c41'), (42, 'c42')):
             tier_row = combined_row(sub, MONTHS, mw, exclude, ranks=[r])
             assert j[key] == pytest.approx(coverage(main_row, tier_row), abs=TOL)
         w3 = [row[o] for o in worst3 if o in row]
@@ -108,7 +108,7 @@ def test_sub_table_matches_python_with_opponent_weights():
             continue
         assert js['subs'][sub]['cover'] == pytest.approx(
             coverage(main_row, row, weights), abs=TOL)
-        for r, key in ((40, 'c40'), (41, 'c41'), (42, 'c42')):
+        for r, key in ((36, 'c36'), (40, 'c40'), (41, 'c41'), (42, 'c42')):
             tier_row = combined_row(sub, MONTHS, mw, exclude, ranks=[r])
             assert js['subs'][sub][key] == pytest.approx(
                 coverage(main_row, tier_row, weights), abs=TOL)

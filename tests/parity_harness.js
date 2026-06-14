@@ -14,14 +14,14 @@ const oppWeights = weightsJson ? JSON.parse(weightsJson) : undefined;
 
 const table = {};
 for (const r of s.charTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, s.PATCH_MONTH)) {
-  table[r.opp] = { comb: r.comb, t40: r.t40, t41: r.t41, t42: r.t42,
+  table[r.opp] = { comb: r.comb, t36: r.t36, t40: r.t40, t41: r.t41, t42: r.t42,
                    spread: r.spread, dpatch: r.dpatch, nmonths: r.nmonths };
 }
 
 const subs = {};
 const st = s.subTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, oppWeights);
 for (const r of st.results) {
-  subs[r.sub] = { cover: r.cover, c40: r.c40, c41: r.c41, c42: r.c42,
+  subs[r.sub] = { cover: r.cover, c36: r.c36, c40: r.c40, c41: r.c41, c42: r.c42,
                   spec: r.spec, strength: r.strength,
                   w3win: r.w3win, corr: r.corr, shared: r.shared };
 }

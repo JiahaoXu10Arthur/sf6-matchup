@@ -6,7 +6,7 @@ const state = {
   rank: 'comb',           // 'comb' | '40' | '41' | '42'
   preset: 'current',      // 'current' | 'all' | 'custom'
   monthW: {},             // {month: weight 0..1}
-  tierW: { 40: 1, 41: 2, 42: 3 },
+  tierW: { 36: 0.5, 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
 };
@@ -19,7 +19,7 @@ const $ = sel => document.querySelector(sel);
 const BAR_HALF = 0.6;     // matchup bar full deflection at |score - 5| = 0.6
 const COVER_HALF = 0.4;   // sub COVER bar full deflection at |cover| = 0.4
 
-const DEFAULT_TIER = { 40: 1, 41: 2, 42: 3 };
+const DEFAULT_TIER = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
 const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
 
 // numeric column layout per view: [widthClass, 'main'|'sub'] — shared by the
@@ -197,8 +197,8 @@ function buildMonthSliders() {
 function buildTierSliders() {
   const box = $('#tier-sliders');
   box.textContent = '';
-  for (const r of ['40', '41', '42']) {
-    box.appendChild(sliderRow(t('rankFull')[r], state.tierW[r], 5, 0.5, v => {
+  for (const r of ['36', '40', '41', '42']) {
+    box.appendChild(sliderRow(t('rankFull')[r], state.tierW[r], 5, 0.05, v => {
       state.tierW[r] = v;
       render();
     }));

@@ -3,8 +3,8 @@
    functions match the Python originals. Keep formulas in sync with METHOD.md. */
 
 const PATCH_MONTH = '202603'; // major all-character balance patch, 2026-03-17
-const DEFAULT_TIER_WEIGHTS = { 40: 1, 41: 2, 42: 3 };
-const RANK_NAMES = { 40: 'HighM', 41: 'GrandM', 42: 'UltM' };
+const DEFAULT_TIER_WEIGHTS = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
+const RANK_NAMES = { 36: 'Master', 40: 'HighM', 41: 'GrandM', 42: 'UltM' };
 const TARGET_INJECT = 0.25;   // weight a targeted (u>1) non-weakness as a 4.5 matchup; keep in sync with scoring.py
 
 function monthWeights(months, profile, patchMonth) {
@@ -147,7 +147,7 @@ function charTable(idx, char, mw, exclude, tierWeights, patchMonth) {
       for (const m of Object.keys(r)) if (m in mw) monthsSeen.add(m);
     rows.push({
       opp,
-      t40: tier['40'], t41: tier['41'], t42: tier['42'],
+      t36: tier['36'], t40: tier['40'], t41: tier['41'], t42: tier['42'],
       comb: num / den,
       spread: Math.max(...present) - Math.min(...present),
       dpatch: pre.length && post.length ? mean(post) - mean(pre) : null,
@@ -174,7 +174,7 @@ function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
     results.push({
       sub,
       cover: coverage(mainRow, row, oppWeights),
-      c40: perTier['40'], c41: perTier['41'], c42: perTier['42'],
+      c36: perTier['36'], c40: perTier['40'], c41: perTier['41'], c42: perTier['42'],
       spec: specialization(mainRow, row, oppWeights),
       strength: strength(row),
       w3win: w3.length ? w3.reduce((s, v) => s + v, 0) / w3.length * 10 : null,

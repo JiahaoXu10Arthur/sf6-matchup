@@ -219,7 +219,7 @@ select:focus-visible, button:focus-visible, input:focus-visible {
   outline-offset: 1px;
 }
 
-.rank-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.rank-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 
 .rank-tabs button {
   font-family: var(--font-display);
