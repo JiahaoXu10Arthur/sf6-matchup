@@ -317,6 +317,38 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
   margin: -0.25rem 0 0.9rem; font-size: 0.74rem; line-height: 1.45;
   color: var(--muted, #8b93a7); max-width: 60ch;
 }
+
+/* usage × win-rate scatter */
+.scatter-wrap { width: 100%; }
+.scatter { width: 100%; height: auto; display: block; font-family: var(--font-body); }
+.scatter .quad { opacity: 0.06; }
+.scatter .q-pop  { fill: var(--t-adv); }
+.scatter .q-sleep{ fill: var(--accent, var(--t-adv)); }
+.scatter .q-over { fill: var(--t-dis); }
+.scatter .q-rare { fill: var(--line); opacity: 0.04; }
+.scatter .quad-label {
+  fill: var(--muted, #8b93a7); font-family: var(--font-display);
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.65;
+}
+.scatter .grid { stroke: var(--line); stroke-width: 1; opacity: 0.28; }
+.scatter .axis { stroke: var(--line); stroke-width: 1.5; }
+.scatter .axis-ref { stroke: var(--text); stroke-width: 1.5; opacity: 0.5; }
+.scatter .axis-ref.dashed { stroke-dasharray: 4 4; opacity: 0.35; }
+.scatter .tick { fill: var(--muted, #8b93a7); font-size: 11px; font-variant-numeric: tabular-nums; }
+.scatter .axis-title { fill: var(--text); font-size: 12px; font-weight: 600; opacity: 0.8; }
+.scatter .pt { cursor: pointer; }
+.scatter .pt circle { stroke: var(--bg, #0e1320); stroke-width: 1.5; transition: r var(--dur) var(--ease); }
+.scatter .pt.t-adv circle { fill: var(--t-adv); }
+.scatter .pt.t-dis circle { fill: var(--t-dis); }
+.scatter .pt.t-even circle { fill: var(--t-even); }
+.scatter .pt-label {
+  fill: var(--text); font-size: 11px; font-weight: 600; opacity: 0.78;
+  pointer-events: none; font-family: var(--font-display); letter-spacing: 0.01em;
+}
+.scatter .pt:hover circle { r: 7.5; }
+.scatter .pt:hover .pt-label { opacity: 1; }
+.scatter .pt.sel circle { stroke: var(--accent, #6ea8ff); stroke-width: 2.5; }
+.scatter .pt.sel .pt-label { opacity: 1; font-weight: 800; }
 .chip-corr { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 .chip-corr.good { color: var(--t-adv); }
 .chip-corr.bad { color: var(--t-dis); }

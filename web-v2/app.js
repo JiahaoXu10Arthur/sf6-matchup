@@ -285,7 +285,7 @@ function wireControls() {
       document.querySelectorAll('.view-switch button').forEach(x => {
         x.classList.toggle('active', x === b); x.setAttribute('aria-selected', x === b);
       });
-      $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
+      $('#view-label').textContent = t(VIEW_LABEL[state.view]);
       render();
     }));
 
@@ -320,10 +320,14 @@ function wireControls() {
 
 /* ---------- tier rendering ---------- */
 
+const VIEW_LABEL = { match: 'labelMatch', subs: 'labelSubs', scatter: 'labelScatter' };
+
 function render() {
   updateTierState();
   paintUsageBadges();
-  if (state.view === 'match') renderMatch(); else renderSubs();
+  if (state.view === 'match') renderMatch();
+  else if (state.view === 'scatter') renderScatter();
+  else renderSubs();
 }
 
 function laneHtml(tier, chips) {
@@ -384,6 +388,104 @@ function renderMatch() {
   legend.hidden = false;
 
   wireChips();
+}
+
+/* ---------- usage × win-rate scatter (cast-wide) ---------- */
+
+const winCls = w => w >= 50.1 ? 't-adv' : w <= 49.9 ? 't-dis' : 't-even';
+
+function renderScatter() {
+  $('#reliab-legend').hidden = true;
+  const ex = exclude();
+  const active = months.filter(m => (state.monthW[m] ?? 0) > 0);
+  const rates = usageCsv ? usageRates(usageCsv, active, 36) : {};
+
+  const pts = [];
+  for (const c of Object.keys(idx)) {
+    if (ex.has(c)) continue;
+    const row = combinedRow(idx, c, state.monthW, ex, state.tierW);
+    if (!Object.keys(row).length || rates[c] == null) continue;
+    pts.push({ char: c, usage: rates[c], win: strength(row) * 10 });
+  }
+
+  $('#hero-summary').innerHTML = '';
+  $('#caption').innerHTML = t('scatterCaption');
+
+  if (pts.length < 2) {
+    $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`;
+    return;
+  }
+
+  const W = 860, H = 560, m = { l: 70, r: 28, t: 44, b: 58 };
+  const xs = pts.map(p => p.usage), ys = pts.map(p => p.win);
+  const xmax = Math.max(...xs) * 1.08;
+  const pad = 0.18;
+  const ymin = Math.min(...ys) - pad, ymax = Math.max(...ys) + pad;
+  const px = u => m.l + u / xmax * (W - m.l - m.r);
+  const py = w => H - m.b - (w - ymin) / (ymax - ymin) * (H - m.t - m.b);
+  const sorted = [...xs].sort((a, b) => a - b);
+  const medUsage = sorted[Math.floor(sorted.length / 2)];
+
+  const xMid = px(medUsage), yMid = py(50);
+  const x0 = px(0), x1 = px(xmax), yTop = py(ymax), yBot = py(ymin);
+
+  // quadrant background tints (only when the 50% line is within view)
+  const quads = (yMid > yTop && yMid < yBot) ? `
+    <rect x="${xMid}" y="${yTop}" width="${x1 - xMid}" height="${yMid - yTop}" class="quad q-pop"/>
+    <rect x="${x0}" y="${yTop}" width="${xMid - x0}" height="${yMid - yTop}" class="quad q-sleep"/>
+    <rect x="${xMid}" y="${yMid}" width="${x1 - xMid}" height="${yBot - yMid}" class="quad q-over"/>
+    <rect x="${x0}" y="${yMid}" width="${xMid - x0}" height="${yBot - yMid}" class="quad q-rare"/>` : '';
+
+  const quadLabel = (key, x, y, anchor) =>
+    `<text class="quad-label" x="${x}" y="${y}" text-anchor="${anchor}">${t(key)}</text>`;
+  const quadLabels = (yMid > yTop && yMid < yBot) ? `
+    ${quadLabel('quadStrongPop', x1 - 8, yTop + 18, 'end')}
+    ${quadLabel('quadSleeper', x0 + 8, yTop + 18, 'start')}
+    ${quadLabel('quadOverrated', x1 - 8, yBot - 10, 'end')}
+    ${quadLabel('quadWeakRare', x0 + 8, yBot - 10, 'start')}` : '';
+
+  // axis ticks
+  let xticks = '';
+  for (let u = 0; u <= xmax; u += 2) {
+    xticks += `<line class="grid" x1="${px(u)}" y1="${yTop}" x2="${px(u)}" y2="${yBot}"/>
+      <text class="tick" x="${px(u)}" y="${yBot + 18}" text-anchor="middle">${u}</text>`;
+  }
+  let yticks = '';
+  const yStep = (ymax - ymin) > 2 ? 0.5 : 0.25;
+  for (let w = Math.ceil(ymin / yStep) * yStep; w <= ymax; w += yStep) {
+    yticks += `<line class="grid" x1="${x0}" y1="${py(w)}" x2="${x1}" y2="${py(w)}"/>
+      <text class="tick" x="${x0 - 10}" y="${py(w) + 4}" text-anchor="end">${w.toFixed(1)}</text>`;
+  }
+
+  const dots = pts.map(p => {
+    const sel = p.char === state.char;
+    const cx = px(p.usage), cy = py(p.win);
+    const title = `${cn(p.char)} · ${p.usage.toFixed(1)}% used · ${p.win.toFixed(2)}% win`;
+    return `<g class="pt ${winCls(p.win)} ${sel ? 'sel' : ''}" data-char="${p.char}">
+      <title>${title}</title>
+      <circle cx="${cx}" cy="${cy}" r="${sel ? 7 : 5}"/>
+      <text class="pt-label" x="${cx + 8}" y="${cy + 3.5}">${cn(p.char)}</text>
+    </g>`;
+  }).join('');
+
+  $('#lanes').innerHTML = `
+    <div class="scatter-wrap">
+      <svg class="scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('labelScatter')}" preserveAspectRatio="xMidYMid meet">
+        ${quads}
+        ${xticks}${yticks}
+        <line class="axis-ref" x1="${x0}" y1="${yMid}" x2="${x1}" y2="${yMid}"/>
+        <line class="axis-ref dashed" x1="${xMid}" y1="${yTop}" x2="${xMid}" y2="${yBot}"/>
+        <line class="axis" x1="${x0}" y1="${yBot}" x2="${x1}" y2="${yBot}"/>
+        <line class="axis" x1="${x0}" y1="${yTop}" x2="${x0}" y2="${yBot}"/>
+        ${quadLabels}
+        <text class="axis-title" x="${(x0 + x1) / 2}" y="${H - 10}" text-anchor="middle">${t('scatterAxisUsage')}</text>
+        <text class="axis-title" transform="rotate(-90 16 ${(yTop + yBot) / 2})" x="16" y="${(yTop + yBot) / 2}" text-anchor="middle">${t('scatterAxisWin')}</text>
+        ${dots}
+      </svg>
+    </div>`;
+
+  $('#lanes').querySelectorAll('.pt').forEach(g =>
+    g.addEventListener('click', () => selectChar(g.dataset.char)));
 }
 
 const strCls = s => s >= 5.05 ? 't-adv' : s <= 4.95 ? 't-dis' : '';
