@@ -37,3 +37,21 @@ def classify(p0, wins, losses, kappa=KAPPA, level=CRED_LEVEL,
         verdict = 'on par'
     return {'shrunk': mean, 'lo': lo, 'hi': hi, 'prob_below': pb,
             'n': n, 'verdict': verdict, 'deficit': (p0 - mean) * pb}
+
+
+def load_personal(path):
+    """Read a personal battlelog CSV into a list of row dicts."""
+    with open(path, newline='') as fh:
+        return [row for row in csv.DictReader(fh)
+                if not row['replay_id'].startswith('#')]
+
+
+def aggregate(rows, char):
+    """{opponent: (wins, losses)} for the games you played as `char`."""
+    wl = defaultdict(lambda: [0, 0])
+    for row in rows:
+        if row['your_char'] != char:
+            continue
+        idx = 0 if row['result'] == 'W' else 1
+        wl[row['opp_char']][idx] += 1
+    return {opp: (w, l) for opp, (w, l) in wl.items()}
