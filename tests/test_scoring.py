@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 from scoring import (month_weights, wavg, coverage, correlation,
                      shared_weaknesses, expand_months, specialization, strength,
-                     usage_weights, reliability)
+                     usage_weights, reliability, polarization)
 
 MONTHS = ['202601', '202602', '202603', '202604', '202605']
 
@@ -179,3 +179,23 @@ def test_reliability_score_is_monotonic_in_depth_and_agreement():
 def test_reliability_score_bounded_unit_interval():
     assert reliability(3, 4, 0.0)['score'] == pytest.approx(1.0)
     assert 0.0 <= reliability(0, 0, 5.0)['score'] <= 1.0
+
+
+def test_polarization_flat_row_is_zero():
+    assert polarization({'A': 5.0, 'B': 5.0, 'C': 5.0}) == 0.0
+
+
+def test_polarization_is_population_std():
+    # values 4, 5, 6 -> mean 5, population variance 2/3, std = sqrt(2/3)
+    assert polarization({'A': 4.0, 'B': 5.0, 'C': 6.0}) == pytest.approx((2 / 3) ** 0.5)
+
+
+def test_polarization_empty_or_single_is_zero():
+    assert polarization({}) == 0.0
+    assert polarization({'A': 4.2}) == 0.0
+
+
+def test_polarization_spread_row_exceeds_tight_row():
+    spread = polarization({'A': 4.0, 'B': 6.0, 'C': 5.0})
+    tight = polarization({'A': 4.9, 'B': 5.1, 'C': 5.0})
+    assert spread > tight

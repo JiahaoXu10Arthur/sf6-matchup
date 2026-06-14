@@ -405,7 +405,7 @@ function renderScatter() {
     if (ex.has(c)) continue;
     const row = combinedRow(idx, c, state.monthW, ex, state.tierW);
     if (!Object.keys(row).length || rates[c] == null) continue;
-    pts.push({ char: c, usage: rates[c], win: strength(row) * 10 });
+    pts.push({ char: c, usage: rates[c], win: strength(row) * 10, pol: polarization(row) });
   }
 
   $('#hero-summary').innerHTML = '';
@@ -457,14 +457,19 @@ function renderScatter() {
       <text class="tick" x="${x0 - 10}" y="${py(w) + 4}" text-anchor="end">${w.toFixed(1)}</text>`;
   }
 
+  // point radius encodes polarization (matchup-row std): bigger = feast-or-famine.
+  const pols = pts.map(p => p.pol), polMax = Math.max(...pols, 0.01);
+  const R_MIN = 4, R_MAX = 9;
+  const radius = pol => R_MIN + pol / polMax * (R_MAX - R_MIN);
+
   const dots = pts.map(p => {
     const sel = p.char === state.char;
-    const cx = px(p.usage), cy = py(p.win);
-    const title = `${cn(p.char)} · ${p.usage.toFixed(1)}% used · ${p.win.toFixed(2)}% win`;
+    const cx = px(p.usage), cy = py(p.win), r = radius(p.pol);
+    const title = `${cn(p.char)} · ${p.usage.toFixed(1)}% used · ${p.win.toFixed(2)}% win · ${t('polLabel')} ${p.pol.toFixed(2)}`;
     return `<g class="pt ${winCls(p.win)} ${sel ? 'sel' : ''}" data-char="${p.char}">
       <title>${title}</title>
-      <circle cx="${cx}" cy="${cy}" r="${sel ? 7 : 5}"/>
-      <text class="pt-label" x="${cx + 8}" y="${cy + 3.5}">${cn(p.char)}</text>
+      <circle cx="${cx}" cy="${cy}" r="${sel ? r + 2 : r}"/>
+      <text class="pt-label" x="${cx + r + 3}" y="${cy + 3.5}">${cn(p.char)}</text>
     </g>`;
   }).join('');
 

@@ -1,4 +1,4 @@
-from statistics import fmean
+from statistics import fmean, pstdev
 
 # Weight given to a targeted opponent (u>1) beyond its actual severity. Fixed at
 # the severity of a 4.5 "slight disadvantage" (sev = (5-4.5)^2 = 0.25) so the
@@ -86,6 +86,14 @@ def strength(row):
     """Overall mean matchup score of a character's combined row (tier proxy).
     Empty row -> neutral 5.0."""
     return fmean(row.values()) if row else 5.0
+
+
+def polarization(row):
+    """Spread of a character's combined matchup row = population std of its scores.
+    High = feast-or-famine (hard counters and free wins); low = even across the cast.
+    Empty or single-opponent rows -> 0.0. Keep in sync with web/scoring.js."""
+    v = list(row.values())
+    return pstdev(v) if len(v) > 1 else 0.0
 
 
 def reliability(nmo, nranks, spread):

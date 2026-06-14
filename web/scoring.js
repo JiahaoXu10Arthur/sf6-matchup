@@ -57,6 +57,15 @@ function strength(row) {
   return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 5.0;
 }
 
+// Spread of a character's combined matchup row = population std of its scores.
+// High = feast-or-famine; low = even across the cast. Keep in sync with scoring.py.
+function polarization(row) {
+  const v = Object.values(row);
+  if (v.length < 2) return 0.0;
+  const mean = v.reduce((s, x) => s + x, 0) / v.length;
+  return Math.sqrt(v.reduce((s, x) => s + (x - mean) ** 2, 0) / v.length);
+}
+
 // How much agreeing data backs a single combined matchup number. Confidence from
 // contributing months (depth), rank-tier coverage (breadth), and cross-rank spread
 // (do the four skill brackets agree?). A fully-sampled cell never falls to 'low' on
@@ -239,7 +248,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     PATCH_MONTH, DEFAULT_TIER_WEIGHTS, RANK_NAMES, TARGET_INJECT,
     monthWeights, wavg, coverage, specialization, strength, correlation, sharedWeaknesses,
-    reliability, usageWeights, usageRates, buildIndex, availableMonths, combinedRow,
-    charTable, subTable,
+    reliability, polarization, usageWeights, usageRates, buildIndex, availableMonths,
+    combinedRow, charTable, subTable,
   };
 }
