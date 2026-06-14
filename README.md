@@ -4,8 +4,8 @@
 
 A reproducible pipeline and interactive web application for **Street Fighter 6**
 matchup analysis and complementary sub-character (pocket pick) recommendation,
-built on Capcom Buckler official battle-diagram data (via the
-[kakuhanapp.com](https://kakuhanapp.com) mirror).
+built on **Capcom Buckler's official battle-diagram API** (`dia_master`), with
+official character names and usage-rate data.
 
 ---
 
@@ -166,11 +166,14 @@ Requires Python 3 (standard library only).
 
 ```bash
 cd scripts
-python3 download.py     --months 202502-202605          # fetch raw pages (idempotent cache)
-python3 build_matrix.py                                  # data/ → output/matrix.csv
+python3 download_buckler.py    --months 202502-202605    # fetch official Buckler JSON (idempotent)
+python3 build_matrix_buckler.py                          # data/buckler/ → output/matrix.csv + usage.csv
 python3 analyze.py   --char TERRY --months 202502-202605 --profile current
 python3 recommend.py --char TERRY --months 202502-202605 --profile current
 ```
+
+> `download.py` / `build_matrix.py` (kakuhanapp mirror) remain as legacy but are
+> superseded by the official Buckler downloader above.
 
 ### Parameters
 
@@ -229,8 +232,8 @@ then served at `https://<user>.github.io/<repo>/web/` and `/web-v2/`.
 
 ## Attribution and disclaimer
 
-Matchup data originates from Capcom's official Street Fighter 6 Buckler battle
-diagrams, accessed via the kakuhanapp.com mirror. This is an unofficial
+Matchup and usage data originate from Capcom's official Street Fighter 6 Buckler
+battle diagrams (`streetfighter.com/6/buckler`). This is an unofficial
 fan-made analysis tool and is not affiliated with or endorsed by Capcom.
 Sample sizes are not published by the source; see `docs/METHOD.md` for the
 resulting statistical caveats.

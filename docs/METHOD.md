@@ -2,14 +2,23 @@
 
 ## 1. Data source
 
-Matchup scores are drawn from **kakuhanapp.com**, specifically the endpoint
-`https://kakuhanapp.com/matchup/master/?month={M}&rank={R}&tool={slug}`.
-The site renders server-side HTML that mirrors Capcom's official Buckler battle
-diagrams. Each matchup score is a win-rate expressed on a 5.0-centered scale:
-a score of 5.237 means a 52.37% win rate for the displayed character against
-that opponent.
+Matchup scores are drawn directly from **Capcom's official Buckler API**:
 
-The site's own tier legend is:
+    https://www.streetfighter.com/6/buckler/api/{lang}/stats/dia_master/{YYYYMM}
+    https://www.streetfighter.com/6/buckler/api/{lang}/stats/usagerate_master/{YYYYMM}
+
+This is a public JSON endpoint — no browser, no login. (The old `stats/dia_master`
+*HTML* page 403s to scripts, but the `api/...` JSON endpoint serves the same data
+to a plain request with normal browser headers.) Each `dia_master` payload holds
+the Master-and-above battle diagrams, control-total, for ranks **36/40/41/42**
+(Master / High / Grand / Ultimate Master), as a 30×30 matrix per rank: a
+30-entry `opponent_header` and 30 `records`, each record's `values` array giving
+per-opponent win rates (`val` like `5.237`, `-` for the mirror). Cells are
+aligned by id (`_oid` → header `id`), not array position. `usagerate_master`
+gives per-character play rates per bracket.
+
+Each matchup score is a win-rate on a 5.0-centered scale: `5.237` = 52.37% win
+rate for the displayed character against that opponent. Buckler's tier legend:
 
 | Score | Label |
 |-------|-------|
@@ -19,36 +28,41 @@ The site's own tier legend is:
 | ≥ 4.7 | Slight disadvantage |
 | < 4.7 | Disadvantage |
 
-**Why kakuhanapp rather than the official Buckler site?** Capcom's `dia_master`
-endpoint returns HTTP 403 to scripts because it requires a login session and
-has bot-protection. It also provides no monthly archive. kakuhanapp mirrors the
-same official Capcom numbers and exposes them with a stable monthly URL
-structure, giving 16 months of archive across the 202502–202605 window. The
-pipeline ingests the full 202502–202605 archive; `matrix.csv` and the web app
-carry all 16 months, and any sub-range can be selected at analysis time.
+**Why official Buckler over a mirror?** The project originally mirrored
+kakuhanapp.com (still present as legacy `download.py`/`build_matrix.py`), but the
+official API is strictly better: it's the source of truth, uses Capcom's
+**official English names** (`M. BISON`, `AKUMA`, `E. HONDA`, …), has no DNS/bot
+flakiness, and the archive reaches back to ~SF6 launch (202306). The pipeline
+ingests 202502–202605 (16 months) by default; `matrix.csv` and the web app carry
+all of it, and any sub-range can be selected at analysis time.
 
-Scores are parsed from matchup card elements matching the HTML pattern:
-`alt="([^"]+)">\s*<div class="card-body[^>]*>\s*<div class="text-muted small">([\d.]+)</div>`.
-A valid page yields exactly 29 opponents. The page's own `<option selected>`
-values (month, rank, slug) are extracted and cross-checked against the filename
-at ingest time; any mismatch means the server served a fallback page and the
-file is discarded rather than ingested as mislabeled data.
+`download_buckler.py` fetches+caches the raw JSON; `build_matrix_buckler.py`
+parses it into the long-format `matrix.csv` (schema unchanged) plus `usage.csv`.
+
+> **Control type (Modern/Classic):** the *all-rank* `dia` endpoint additionally
+> splits each character by control type, but only with an aggregate "Master"
+> league rank (no MR sub-brackets). Capcom does not cross the two axes — you get
+> skill brackets (`dia_master`) or the control split (`dia`), not both — so this
+> pipeline uses the skill-bracket data and does not model Modern/Classic.
 
 ## 2. Roster and slug mapping
 
-The roster covers **30 characters**. URL slugs are lowercase; page alt-text
-names are uppercase display names. Most slugs map trivially (e.g. `ryu` →
-`RYU`) but five require explicit mapping:
+The roster covers **30 characters**. Display names are Buckler's official
+English `name_alpha`; the internal slug (`tool_name`) is often the JP
+romanization, so two notably differ from the display name:
 
-| Slug | Display name |
+| Slug (`tool_name`) | Official display name |
 |------|-------------|
-| `aki` | A.K.I. |
+| `vega` | **M. BISON** (the dictator; JP "Vega") |
+| `gouki` | **AKUMA** (JP "Gouki") |
+| `honda` | E. HONDA |
+| `cviper` | C. VIPER |
 | `deejay` | DEE JAY |
-| `honda` | E.HONDA |
+| `aki` | A.K.I. |
 | `chunli` | CHUN-LI |
-| `cviper` | C.VIPER |
 
-Each character's page lists 29 opponents (every other character).
+Slugs are unchanged from the older mirror, so headshot images (`web/img/{slug}.jpg`)
+keep resolving. Each character faces the other 29.
 
 ## 3. Rank tiers and skill-depth weights
 
@@ -183,8 +197,9 @@ ability to cover the main character's worst matchups.
 
 ```
 COVER = Σ w(O) · (sub_vs_O − 5.0) / Σ w(O)
-where w(O) = u(O) · sev(O) + max(0, u(O) − 1) · TARGET_INJECT
+where w(O) = u(O) · usage(O) · sev(O) + max(0, u(O) − 1) · TARGET_INJECT
       sev(O) = max(0, 5.0 − main_vs_O)²
+      usage(O) = sqrt(play_rate(O) / mean_play_rate)
 ```
 
 `sev(O)` is the main's weakness severity against opponent O: only opponents
@@ -211,6 +226,15 @@ as a stepper per opponent:
   disadvantage" — so targeting always counts an opponent as at least one
   moderate weakness, a fixed amount independent of how bad the main's worst
   matchup happens to be.
+
+`usage(O)` is a **popularity multiplier** (default on; toggle in the web app)
+that down-weights opponents few people play. It is `sqrt(play_rate(O) / mean)`
+from Buckler's `usagerate_master` data — averaged over the active months at
+Master (rank 36) — so an average-popularity opponent = 1.0, a popular one
+somewhat above (RYU ≈ 1.6), a rare one somewhat below (E. HONDA ≈ 0.55). The
+`sqrt` dampens it so a 9%-played character doesn't dwarf a 1% one 9×. This
+addresses the rare-character inflation: a sub that "covers" a barely-played
+opponent earns less credit for it. With the toggle off, `usage(O) = 1` for all.
 
 **Specialization (SPEC) — strength-adjusted coverage**:
 

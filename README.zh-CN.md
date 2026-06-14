@@ -4,7 +4,7 @@
 
 一个可复现的 **《街头霸王 6》** 对局分析与互补副角（备用角色）推荐工具，
 基于 Capcom Buckler 官方对战相性图数据（通过
-[kakuhanapp.com](https://kakuhanapp.com) 镜像获取）构建，包含数据管线与交互式网页应用。
+[Capcom Buckler 官方 API](https://www.streetfighter.com/6/buckler) 直接获取，使用官方角色名与使用率数据）构建，包含数据管线与交互式网页应用。
 
 ---
 
@@ -140,8 +140,8 @@ COVER = Σ w(O) · (副角对O − 5) / Σ w(O)
 
 ```bash
 cd scripts
-python3 download.py     --months 202502-202605          # 抓取原始页面（幂等缓存）
-python3 build_matrix.py                                  # data/ → output/matrix.csv
+python3 download_buckler.py    --months 202502-202605    # 抓取官方 Buckler JSON（幂等缓存）
+python3 build_matrix_buckler.py                          # data/buckler/ → output/matrix.csv + usage.csv
 python3 analyze.py   --char TERRY --months 202502-202605 --profile current
 python3 recommend.py --char TERRY --months 202502-202605 --profile current
 ```
@@ -199,6 +199,6 @@ python3 -m pytest tests/ -v        # JS 一致性测试需要 `node`
 
 ## 致谢与免责声明
 
-对局数据来源于 Capcom《街头霸王 6》官方 Buckler 对战相性图，通过 kakuhanapp.com
-镜像获取。本项目为非官方的爱好者分析工具，与 Capcom 无任何关联，亦未获其认可。
+对局与使用率数据来源于 Capcom《街头霸王 6》官方 Buckler 对战相性图
+（streetfighter.com/6/buckler）。本项目为非官方的爱好者分析工具，与 Capcom 无任何关联，亦未获其认可。
 数据来源未公开样本量；由此产生的统计注意事项见 `docs/METHOD.md`。
