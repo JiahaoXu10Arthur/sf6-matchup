@@ -54,3 +54,34 @@ def test_aggregate_filters_by_char_and_counts_wl():
     assert agg['DHALSIM'] == (1, 2)   # 1 win, 2 losses
     assert agg['KEN'] == (2, 0)
     assert 'RYU' not in agg            # that game was on LUKE, not TERRY
+
+
+from personal_scout import baseline_winrates, scout, format_report
+
+
+def test_baseline_winrates_are_probabilities():
+    # combined_row scores are ~5.0-centred /10 -> probabilities near 0.5
+    base = baseline_winrates('TERRY', months=None, exclude={'INGRID'})
+    assert base, 'TERRY should have baseline opponents'
+    assert all(0.2 < p < 0.8 for p in base.values())
+
+
+def test_scout_produces_verdicts_sorted_worst_first():
+    rows = load_personal(FIX)
+    base = baseline_winrates('TERRY', months=None, exclude={'INGRID'})
+    results = scout(aggregate(rows, 'TERRY'), base)
+    # only opponents you have games against AND that exist in the baseline
+    names = [r['opp'] for r in results]
+    assert 'DHALSIM' in names and 'KEN' in names
+    # sorted by deficit descending -> first row has the largest credible deficit
+    deficits = [r['deficit'] for r in results]
+    assert deficits == sorted(deficits, reverse=True)
+
+
+def test_format_report_contains_headline_and_table():
+    base = baseline_winrates('TERRY', months=None, exclude={'INGRID'})
+    results = scout(aggregate(load_personal(FIX), 'TERRY'), base)
+    md = format_report('TERRY', results)
+    assert '# TERRY' in md
+    assert '| Opponent |' in md
+    assert 'DHALSIM' in md
