@@ -110,20 +110,20 @@ const STRINGS = {
 const CHAR_ZH = {
   'RYU': '隆', 'LUKE': '卢克', 'JAMIE': '杰米', 'CHUN-LI': '春丽',
   'GUILE': '古烈', 'KIMBERLY': '金佰莉', 'JURI': '韩蛛俐', 'KEN': '肯',
-  'BLANKA': '布兰卡', 'DHALSIM': '达尔西姆', 'E.HONDA': '本田',
+  'BLANKA': '布兰卡', 'DHALSIM': '达尔西姆', 'E. HONDA': '本田',
   'DEE JAY': '迪·杰', 'MANON': '曼侬', 'MARISA': '玛丽莎', 'JP': 'JP',
   'ZANGIEF': '桑吉尔夫', 'LILY': '莉莉', 'CAMMY': '嘉米', 'RASHID': '拉希德',
-  'A.K.I.': '阿鬼', 'ED': '爱德', 'GOUKI': '豪鬼', 'VEGA': '维加',
+  'A.K.I.': '阿鬼', 'ED': '爱德', 'AKUMA': '豪鬼', 'M. BISON': '维加',
   'TERRY': '特瑞', 'MAI': '舞', 'ELENA': '艾琳娜', 'SAGAT': '沙加特',
-  'C.VIPER': '毒蛇', 'ALEX': '亚历克斯', 'INGRID': '英格丽德',
+  'C. VIPER': '毒蛇', 'ALEX': '亚历克斯', 'INGRID': '英格丽德',
 };
 
 /* In-game character-select roster order (drives the dropdown). */
 const ROSTER_ORDER = [
   'LUKE', 'JAMIE', 'MANON', 'KIMBERLY', 'MARISA', 'LILY', 'JP', 'JURI',
-  'DEE JAY', 'CAMMY', 'RYU', 'E.HONDA', 'BLANKA', 'GUILE', 'KEN', 'CHUN-LI',
-  'ZANGIEF', 'DHALSIM', 'RASHID', 'A.K.I.', 'ED', 'GOUKI', 'VEGA', 'TERRY',
-  'MAI', 'ELENA', 'SAGAT', 'C.VIPER', 'ALEX', 'INGRID',
+  'DEE JAY', 'CAMMY', 'RYU', 'E. HONDA', 'BLANKA', 'GUILE', 'KEN', 'CHUN-LI',
+  'ZANGIEF', 'DHALSIM', 'RASHID', 'A.K.I.', 'ED', 'AKUMA', 'M. BISON', 'TERRY',
+  'MAI', 'ELENA', 'SAGAT', 'C. VIPER', 'ALEX', 'INGRID',
 ];
 
 let lang = localStorage.getItem('sf6lab-lang')
@@ -132,12 +132,12 @@ let lang = localStorage.getItem('sf6lab-lang')
 /* Display name -> URL slug, for headshot images at IMG_BASE + slug + '.jpg'. */
 const SLUG_BY_NAME = {
   'A.K.I.': 'aki', 'ALEX': 'alex', 'BLANKA': 'blanka', 'CAMMY': 'cammy',
-  'CHUN-LI': 'chunli', 'C.VIPER': 'cviper', 'DEE JAY': 'deejay', 'DHALSIM': 'dhalsim',
-  'ED': 'ed', 'ELENA': 'elena', 'GOUKI': 'gouki', 'GUILE': 'guile', 'E.HONDA': 'honda',
+  'CHUN-LI': 'chunli', 'C. VIPER': 'cviper', 'DEE JAY': 'deejay', 'DHALSIM': 'dhalsim',
+  'ED': 'ed', 'ELENA': 'elena', 'AKUMA': 'gouki', 'GUILE': 'guile', 'E. HONDA': 'honda',
   'INGRID': 'ingrid', 'JAMIE': 'jamie', 'JP': 'jp', 'JURI': 'juri', 'KEN': 'ken',
   'KIMBERLY': 'kimberly', 'LILY': 'lily', 'LUKE': 'luke', 'MAI': 'mai', 'MANON': 'manon',
   'MARISA': 'marisa', 'RASHID': 'rashid', 'RYU': 'ryu', 'SAGAT': 'sagat', 'TERRY': 'terry',
-  'VEGA': 'vega', 'ZANGIEF': 'zangief',
+  'M. BISON': 'vega', 'ZANGIEF': 'zangief',
 };
 
 // base path for headshots; web-v2 overrides to '../web/img/'. The standalone
