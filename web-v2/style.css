@@ -452,3 +452,95 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition-duration: 0.01ms !important; } }
+
+/* ---------- Bars view (ported from v1; scoped under .bars) ---------- */
+.bars {
+  --surface-2: oklch(24% 0.03 265);
+  --adv: oklch(78% 0.14 195);
+  --adv-deep: oklch(60% 0.12 195);
+  --dis: oklch(68% 0.19 40);
+  --dis-deep: oklch(52% 0.16 40);
+  --even-line: oklch(50% 0.04 265);
+  --name-col: 10rem;
+  --num-col: 12.6rem;
+}
+
+.bars .kpis { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap; }
+.bars .kpi {
+  flex: 1 1 0; min-width: 7.5rem;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--line); border-left: 2px solid var(--line);
+  padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.2rem;
+}
+.bars .kpi.adv { border-left-color: var(--adv); }
+.bars .kpi.dis { border-left-color: var(--dis); }
+.bars .kpi-label {
+  font-family: var(--font-display); font-size: 0.58rem; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-dim);
+}
+.bars .kpi-val {
+  font-family: var(--font-mono); font-weight: 700; font-size: 1.05rem; line-height: 1.1;
+  display: flex; align-items: baseline; gap: 0.4rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bars .kpi.adv .kpi-val { color: var(--adv); }
+.bars .kpi.dis .kpi-val { color: var(--dis); }
+.bars .kpi-val small { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500; color: var(--text-dim); }
+
+.bars .axis {
+  display: grid; grid-template-columns: var(--name-col) 1fr var(--num-col);
+  gap: var(--space-2); font-family: var(--font-display);
+  font-size: 0.6rem; letter-spacing: 0.12em; color: var(--text-dim);
+  padding-bottom: 0.3rem; border-bottom: 1px solid var(--line); margin-bottom: 0.4rem;
+}
+.bars .axis .axis-bar { display: flex; justify-content: space-between; position: relative; }
+.bars .axis .axis-bar::after {
+  content: ''; position: absolute; left: 50%; top: 1.3em; bottom: -0.7rem;
+  border-left: 1px dashed var(--even-line);
+}
+.bars .rows { display: flex; flex-direction: column; position: relative; }
+.bars .row {
+  display: grid; grid-template-columns: var(--name-col) 1fr var(--num-col);
+  gap: var(--space-2); align-items: center; padding: 0.22rem 0;
+  border-bottom: 1px solid oklch(26% 0.025 265);
+  transition: background var(--dur) var(--ease); cursor: pointer;
+}
+.bars .row:hover { background: oklch(22% 0.03 265 / 0.6); }
+.bars .row:hover .name { color: var(--accent); }
+.bars .row .name { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.bars .row-avatar {
+  width: 2.3rem; aspect-ratio: 100 / 46; object-fit: cover;
+  border-radius: 4px; flex: none; background: var(--surface-2);
+}
+.bars .row .row-name-text {
+  font-family: var(--font-display); font-size: 0.8rem; font-weight: 600;
+  letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bars .row .name .flag { color: var(--dis); margin-left: 0.3em; }
+.bars .bar-track { position: relative; height: 14px; }
+.bars .bar-track::before {
+  content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px;
+  border-left: 1px dashed var(--even-line);
+}
+.bars .bar {
+  position: absolute; top: 2px; bottom: 2px; width: 50%;
+  transform-origin: left center;
+  transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.bars .bar.adv {
+  left: 50%; background: linear-gradient(90deg, var(--adv-deep), var(--adv));
+  box-shadow: 0 0 10px oklch(78% 0.14 195 / 0.25);
+}
+.bars .bar.dis {
+  left: 0; transform-origin: right center;
+  background: linear-gradient(270deg, var(--dis-deep), var(--dis));
+  box-shadow: 0 0 10px oklch(68% 0.19 40 / 0.25);
+}
+.bars .nums {
+  display: flex; justify-content: flex-end; gap: 0.7rem;
+  font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 0.78rem;
+}
+.bars .col-main { font-family: var(--font-mono); font-weight: 700; text-align: right; font-size: 0.85rem; }
+.bars .col-sub { font-family: var(--font-mono); color: var(--text-dim); text-align: right; }
+.bars .col-main.adv { color: var(--adv); }
+.bars .col-main.dis { color: var(--dis); }

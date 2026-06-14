@@ -21,6 +21,7 @@ let usageCsv = '';
 const $ = sel => document.querySelector(sel);
 const DEFAULT_TIER = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
 const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
+const BAR_HALF = 0.6;     // matchup bar full deflection at |score - 5| = 0.6 (bars view)
 
 IMG_BASE = '../web/img/';   // headshots live under web/; v2 reaches back into it
 
@@ -82,7 +83,9 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
   document.querySelectorAll('[data-i18n-rank]').forEach(el => el.textContent = t('rank')[el.dataset.i18nRank]);
   document.querySelectorAll('.lang-switch button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
-  $('#view-label').textContent = t(state.view === 'match' ? 'labelMatch' : 'labelSubs');
+  $('#view-label').textContent = t(state.view === 'bars' ? 'labelBars'
+    : state.view === 'subs' ? 'labelSubs'
+    : state.view === 'scatter' ? 'labelScatter' : 'labelMatch');
   $('#char-name').textContent = cn(state.char);
   setAvatar($('#char-avatar'), state.char);
   document.querySelectorAll('#char-select option').forEach(o => o.textContent = cn(o.value));
@@ -348,12 +351,13 @@ function wireControls() {
 
 /* ---------- tier rendering ---------- */
 
-const VIEW_LABEL = { match: 'labelMatch', subs: 'labelSubs', scatter: 'labelScatter' };
+const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter' };
 
 function render() {
   updateTierState();
   paintUsageBadges();
   if (state.view === 'match') renderMatch();
+  else if (state.view === 'bars') renderBars();
   else if (state.view === 'scatter') renderScatter();
   else renderSubs();
 }
@@ -416,6 +420,59 @@ function renderMatch() {
   legend.hidden = false;
 
   wireChips();
+}
+
+/* ---------- bars view (ported from v1's diverging-bar table) ---------- */
+
+function barRowHtml(r, metric) {
+  const v = metric(r);
+  const frac = Math.max(-1, Math.min(1, (v - 5.0) / BAR_HALF));
+  const barCls = frac >= 0 ? 'adv' : 'dis';
+  const flag = r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '';
+  return `<div class="row" data-char="${r.opp}">
+    <span class="name"><img class="row-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="row-name-text">${cn(r.opp)}${flag}</span></span>
+    <div class="bar-track"><div class="bar ${barCls}" style="transform:scaleX(${Math.abs(frac)})"></div></div>
+    <div class="nums">
+      <span class="col-main ${v >= 5 ? 'adv' : 'dis'}">${fmt(v, 2)}</span>
+      <span class="col-sub">Δ ${sfmt(r.dpatch)}</span>
+      <span class="col-sub">${r.nmonths}/${months.length}${t('moSuffix')}</span>
+    </div>
+  </div>`;
+}
+
+function renderBars() {
+  const table = charTable(idx, state.char, state.monthW, exclude(), state.tierW, PATCH_MONTH);
+  const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
+  const rows = table.filter(r => metric(r) !== null).sort((a, b) => metric(a) - metric(b));
+
+  $('#hero-summary').innerHTML = '';
+  $('#caption').innerHTML = t('headMatch', {
+    char: cn(state.char), n: rows.length,
+    metric: state.rank === 'comb' ? t('metricComb') : t('rankFull')[state.rank],
+  });
+  $('#reliab-legend').hidden = true;
+
+  if (!rows.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('tierEmpty')}</div>`; return; }
+
+  const hardest = rows[0], best = rows[rows.length - 1];
+  const kpis = [
+    { label: t('kHardest'), val: cn(hardest.opp), sub: fmt(metric(hardest), 2), tone: 'dis' },
+    { label: t('kDis'), val: rows.filter(r => metric(r) < 4.9).length, tone: 'dis' },
+    { label: t('kAdv'), val: rows.filter(r => metric(r) > 5.1).length, tone: 'adv' },
+    { label: t('kBest'), val: cn(best.opp), sub: fmt(metric(best), 2), tone: 'adv' },
+  ];
+  const kpiHtml = kpis.map(c =>
+    `<div class="kpi ${c.tone || ''}"><span class="kpi-label">${c.label}</span><span class="kpi-val">${c.val}${c.sub ? `<small>${c.sub}</small>` : ''}</span></div>`).join('');
+  const axisHtml = `<span>${t('axisOpponent')}</span>` +
+    `<span class="axis-bar"><span>${t('axisLosing')}</span><span>${t('axisEven')}</span><span>${t('axisWinning')}</span></span>` +
+    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub">${t('hDpatch')}</span><span class="col-sub">${t('hMo')}</span></div>`;
+
+  $('#lanes').innerHTML =
+    `<div class="bars"><div class="kpis">${kpiHtml}</div><div class="axis">${axisHtml}</div>` +
+    `<div class="rows">${rows.map(r => barRowHtml(r, metric)).join('')}</div></div>`;
+
+  document.querySelectorAll('#lanes .row[data-char]').forEach(el =>
+    el.addEventListener('click', () => selectChar(el.dataset.char)));
 }
 
 /* ---------- usage × win-rate scatter (cast-wide) ---------- */

@@ -4,9 +4,11 @@ const STRINGS = {
   en: {
     kicker: 'CAPCOM BUCKLER DATA · MASTER+',
     viewMatch: 'Matchups',
+    viewBars: 'Bars',
     viewSubs: 'Sub finder',
     viewScatter: 'Usage × Win',
     labelMatch: 'MATCHUPS',
+    labelBars: 'BARS',
     labelSubs: 'SUB FINDER',
     labelScatter: 'USAGE × WIN%',
     scatterCaption: 'Every character — <b>usage rate</b> (how often they are played) vs <b>overall win rate</b>; <b>dot size</b> = polarization (how feast-or-famine their matchups are). The win-rate axis spans barely 1.5 points: the cast is tightly balanced, so quadrants matter more than exact position.',
@@ -73,9 +75,11 @@ const STRINGS = {
   zh: {
     kicker: 'CAPCOM BUCKLER 官方数据 · 大师段位以上',
     viewMatch: '相性表',
+    viewBars: '柱状图',
     viewSubs: '副角推荐',
     viewScatter: '使用率 × 胜率',
     labelMatch: '相性表',
+    labelBars: '柱状图',
     labelSubs: '副角推荐',
     labelScatter: '使用率 × 胜率',
     scatterCaption: '全角色 — <b>使用率</b>（被使用的频率）对比<b>总体胜率</b>；<b>点的大小</b> = 极化度（对局两极分化程度）。胜率轴的跨度仅约 1.5 个百分点：版本高度平衡，因此所处象限比精确位置更重要。',
