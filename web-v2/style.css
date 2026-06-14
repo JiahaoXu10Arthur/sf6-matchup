@@ -208,6 +208,14 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .month-add { width: 100%; margin-top: 2px; font-family: var(--font-display); font-size: 0.74rem; font-weight: 600; padding: 0.32rem 0.4rem; background: var(--surface); color: var(--text-dim); border: 1px dashed var(--line); border-radius: 6px; cursor: pointer; }
 .month-add:hover { border-color: var(--accent); color: var(--text); }
 
+.usage-toggle {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.04em;
+  color: var(--text-dim); cursor: pointer; margin: 0.1rem 0 0.4rem;
+}
+.usage-toggle input { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+.usage-toggle:hover { color: var(--text); }
+
 .check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; cursor: pointer; }
 .check small { color: var(--text-dim); }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }

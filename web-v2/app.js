@@ -10,10 +10,12 @@ const state = {
   tierW: { 36: 0.5, 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
+  useUsage: true,         // weight opponents by play rate (down-weights rare chars)
 };
 
 let idx = null;
 let months = [];
+let usageCsv = '';
 
 const $ = sel => document.querySelector(sel);
 const DEFAULT_TIER = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
@@ -58,6 +60,12 @@ async function init() {
   }
   idx = buildIndex(csv);
   months = availableMonths(csv);
+  if (typeof USAGE_CSV !== 'undefined') {
+    usageCsv = USAGE_CSV;
+  } else {
+    const ur = await fetch('../output/usage.csv');
+    usageCsv = ur.ok ? await ur.text() : '';
+  }
   state.monthW = monthWeights(months, 'current', PATCH_MONTH);
   $('#loading').remove();
   buildCharSelect();
@@ -82,6 +90,13 @@ function applyI18n() {
 }
 
 function exclude() { return new Set(Object.keys(state.oppW).filter(c => state.oppW[c] === 0)); }
+
+// usage-weight map for the active months (null when the toggle is off)
+function usageMap() {
+  if (!state.useUsage || !usageCsv) return null;
+  const active = months.filter(m => (state.monthW[m] ?? 0) > 0);
+  return usageWeights(usageRates(usageCsv, active, 36));
+}
 
 /* ---------- controls (shared shape with v1) ---------- */
 
@@ -219,6 +234,8 @@ function resetDefaults() {
   state.rank = 'comb';
   state.tierW = { ...DEFAULT_TIER };
   state.oppW = { INGRID: 0 };
+  state.useUsage = true;
+  $('#usage-toggle').checked = true;
   setPreset('current');
   state.monthW = monthWeights(months, 'current', PATCH_MONTH);
   document.querySelectorAll('.rank-tabs button').forEach(x => {
@@ -273,6 +290,8 @@ function wireControls() {
       state.monthW = monthWeights(months, b.dataset.preset, PATCH_MONTH);
       buildMonthSliders(); render();
     }));
+
+  $('#usage-toggle').addEventListener('change', e => { state.useUsage = e.target.checked; render(); });
 
   $('#reset-btn').addEventListener('click', resetDefaults);
 }
@@ -362,7 +381,7 @@ function subRow(r, i, cover, maxAbs) {
 }
 
 function renderSubs() {
-  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW);
+  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW, usageMap());
   const cover = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
   const sortVal = r => state.subSort === 'spec' ? r.spec
     : state.subSort === 'str' ? r.strength : cover(r);

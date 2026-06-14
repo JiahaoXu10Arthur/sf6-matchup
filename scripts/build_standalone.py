@@ -19,6 +19,7 @@ OUT = ROOT / 'standalone'
 I18N = (WEB / 'i18n.js').read_text()
 SCORING = (WEB / 'scoring.js').read_text()
 CSV = (ROOT / 'output' / 'matrix.csv').read_text()
+USAGE = (ROOT / 'output' / 'usage.csv').read_text()
 
 # inline character headshots as data URIs so offline builds show portraits
 # without any external requests; imgSrc() prefers CHAR_IMG over the img/ path
@@ -50,6 +51,7 @@ def build(index_path, css_path, app_path, out_name):
 
     bundle = (
         f'<script>var MATRIX_CSV = {json.dumps(CSV)};</script>\n'
+        f'<script>var USAGE_CSV = {json.dumps(USAGE)};</script>\n'
         f'<script>var CHAR_IMG = {json.dumps(CHAR_IMG)};</script>\n'
         f'<script>\n{I18N}\n</script>\n'
         f'<script>\n{SCORING}\n</script>\n'

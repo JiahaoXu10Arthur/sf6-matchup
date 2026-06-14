@@ -294,6 +294,14 @@ select:focus-visible, button:focus-visible, input:focus-visible {
 }
 .month-add:hover { border-color: var(--accent); color: var(--text); }
 
+.usage-toggle {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.04em;
+  color: var(--text-dim); cursor: pointer; margin: 0.1rem 0 0.5rem;
+}
+.usage-toggle input { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+.usage-toggle:hover { color: var(--text); }
+
 input[type="range"] {
   -webkit-appearance: none; appearance: none;
   width: 100%; height: 3px;

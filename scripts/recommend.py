@@ -1,12 +1,28 @@
 import argparse
+import csv
+from collections import defaultdict
 from pathlib import Path
 
 from analyze import combined_row, fmt, resolve_weights
 from roster import NAME_BY_SLUG
 from scoring import (correlation, coverage, expand_months, shared_weaknesses,
-                     specialization, strength)
+                     specialization, strength, usage_weights)
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_usage_weights(months, rank=36):
+    """{char: sqrt(play_rate/mean)} over the given months at one rank, from
+    output/usage.csv. Returns {} if the file is absent."""
+    path = ROOT / 'output' / 'usage.csv'
+    if not path.exists():
+        return {}
+    rates = defaultdict(list)
+    with path.open() as fh:
+        for row in csv.DictReader(fh):
+            if int(row['rank']) == rank and row['month'] in months:
+                rates[row['char']].append(float(row['play_rate']))
+    return usage_weights({c: sum(v) / len(v) for c, v in rates.items()})
 
 
 def main():
@@ -27,6 +43,7 @@ def main():
     worst3 = sorted(main_row, key=main_row.get)[:3]
     candidates = [n for n in NAME_BY_SLUG.values()
                   if n != args.char and n not in exclude]
+    usage = load_usage_weights(months)
 
     results = []
     for sub in candidates:
@@ -35,14 +52,14 @@ def main():
             continue
         per_tier = {r: coverage(main_row,
                                 combined_row(sub, months, mw,
-                                             exclude, ranks=[r]))
+                                             exclude, ranks=[r]), None, usage)
                     for r in (40, 41, 42)}
         w3 = [row[o] for o in worst3 if o in row]
         results.append({
             'sub': sub,
-            'cover': coverage(main_row, row),
+            'cover': coverage(main_row, row, None, usage),
             'c40': per_tier[40], 'c41': per_tier[41], 'c42': per_tier[42],
-            'spec': specialization(main_row, row),
+            'spec': specialization(main_row, row, None, usage),
             'strength': strength(row),
             'w3win': sum(w3) / len(w3) * 10 if w3 else None,
             'corr': correlation(main_row, row),

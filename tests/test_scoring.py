@@ -5,7 +5,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 from scoring import (month_weights, wavg, coverage, correlation,
-                     shared_weaknesses, expand_months, specialization, strength)
+                     shared_weaknesses, expand_months, specialization, strength,
+                     usage_weights)
 
 MONTHS = ['202601', '202602', '202603', '202604', '202605']
 
@@ -120,6 +121,24 @@ def test_specialization_rewards_a_targeted_counter():
     sub = {'A': 6.0, 'B': 5.0, 'C': 5.0}     # mean 5.333; vs A is +0.667 above own mean
     assert specialization(main, sub) == pytest.approx(6.0 - (16.0 / 3))
     assert specialization(main, sub) > 0
+
+
+def test_usage_weights_sqrt_normalized():
+    # mean rate = 4.0; sqrt(rate/mean): 6->1.225, 4->1.0, 2->0.707
+    w = usage_weights({'A': 6.0, 'B': 4.0, 'C': 2.0})
+    assert w['B'] == pytest.approx(1.0)
+    assert w['A'] == pytest.approx(1.5 ** 0.5)
+    assert w['C'] == pytest.approx(0.5 ** 0.5)
+    assert usage_weights({}) == {}
+
+
+def test_coverage_usage_downweights_rare_opponent():
+    main = {'A': 4.0, 'B': 4.0}          # equal weaknesses (sev 1.0 each)
+    sub = {'A': 6.0, 'B': 5.0}           # +1 vs A, neutral vs B
+    # no usage: w(A)=w(B)=1 -> (1*1 + 1*0)/2 = 0.5
+    assert coverage(main, sub) == pytest.approx(0.5)
+    # usage halves A's weight: w(A)=0.5, w(B)=2 -> (0.5*1 + 2*0)/2.5 = 0.2
+    assert coverage(main, sub, None, {'A': 0.5, 'B': 2.0}) == pytest.approx(0.2)
 
 
 def test_correlation_no_shared_opponents_returns_zero():

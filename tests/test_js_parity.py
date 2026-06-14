@@ -34,11 +34,11 @@ pytestmark = [
 ]
 
 
-def js_results(profile, weights=None):
+def js_results(profile, weights=None, usage=None):
     args = ['node', str(ROOT / 'tests' / 'parity_harness.js'), str(MATRIX),
-            'TERRY', profile]
-    if weights is not None:
-        args.append(json.dumps(weights))
+            'TERRY', profile,
+            json.dumps(weights) if weights is not None else '',
+            json.dumps(usage) if usage is not None else '']
     out = subprocess.run(args, capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
 
@@ -112,3 +112,19 @@ def test_sub_table_matches_python_with_opponent_weights():
             tier_row = combined_row(sub, MONTHS, mw, exclude, ranks=[r])
             assert js['subs'][sub][key] == pytest.approx(
                 coverage(main_row, tier_row, weights), abs=TOL)
+
+
+def test_sub_table_matches_python_with_usage_weights():
+    mw = month_weights(MONTHS, 'current', PATCH_MONTH)
+    exclude = {'INGRID'}
+    usage = {'RYU': 1.6, 'E. HONDA': 0.5, 'LUKE': 1.0, 'M. BISON': 1.2}
+    js = js_results('current', usage=usage)
+    main_row = combined_row('TERRY', MONTHS, mw, exclude)
+    for sub in (n for n in NAME_BY_SLUG.values() if n != 'TERRY' and n not in exclude):
+        row = combined_row(sub, MONTHS, mw, exclude)
+        if not row:
+            continue
+        assert js['subs'][sub]['cover'] == pytest.approx(
+            coverage(main_row, row, None, usage), abs=TOL)
+        assert js['subs'][sub]['spec'] == pytest.approx(
+            specialization(main_row, row, None, usage), abs=TOL)

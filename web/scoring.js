@@ -25,17 +25,30 @@ function wavg(scores, weights) {
   return den ? num / den : null;
 }
 
-// w(O) = u(O)·sev(O) + max(0, u(O)−1)·TARGET_INJECT,  sev = max(0, 5−main)².
+// w(O) = u(O)·usage(O)·sev(O) + max(0, u(O)−1)·TARGET_INJECT,  sev = max(0, 5−main)².
 // u defaults to 1 (→ plain weakness-weighted scheme), u=0 drops O, u>1 targets it.
-function weaknessWeights(mainRow, oppWeights) {
+// usage(O) is an optional popularity multiplier (default 1) down-weighting rare opps.
+function weaknessWeights(mainRow, oppWeights, usage) {
   const w = {};
   for (const [o, ms] of Object.entries(mainRow)) {
-    const sev = Math.max(0, 5.0 - ms) ** 2;
+    let sev = Math.max(0, 5.0 - ms) ** 2;
+    if (usage) sev *= usage[o] ?? 1;
     const u = oppWeights ? (oppWeights[o] ?? 1) : 1;
     const wt = u * sev + Math.max(0, u - 1) * TARGET_INJECT;
     if (wt) w[o] = wt;
   }
   return w;
+}
+
+// per-opponent usage weight from {char: play_rate}: sqrt(rate / mean), dampened.
+function usageWeights(rates) {
+  const vals = Object.values(rates);
+  if (!vals.length) return {};
+  const mean = vals.reduce((s, x) => s + x, 0) / vals.length;
+  if (!mean) return {};
+  const out = {};
+  for (const [c, r] of Object.entries(rates)) out[c] = Math.sqrt(r / mean);
+  return out;
 }
 
 // overall mean matchup score of a row (tier proxy); empty -> neutral 5.0
@@ -44,9 +57,9 @@ function strength(row) {
   return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 5.0;
 }
 
-function coverage(mainRow, subRow, oppWeights) {
+function coverage(mainRow, subRow, oppWeights, usage) {
   // weakness-weighted ABSOLUTE edge. Missing subRow entries count as neutral (5.0).
-  const w = weaknessWeights(mainRow, oppWeights);
+  const w = weaknessWeights(mainRow, oppWeights, usage);
   let num = 0, den = 0;
   for (const [opp, wt] of Object.entries(w)) {
     num += wt * ((subRow[opp] ?? 5.0) - 5.0);
@@ -55,12 +68,12 @@ function coverage(mainRow, subRow, oppWeights) {
   return den ? num / den : 0.0;
 }
 
-function specialization(mainRow, subRow, oppWeights) {
+function specialization(mainRow, subRow, oppWeights, usage) {
   // coverage measured relative to the sub's own average, so a globally-strong
   // character nets ~0 and only genuine counters score high. Missing subRow
   // entries count as neutral relative to the sub (subMean).
   const subMean = strength(subRow);
-  const w = weaknessWeights(mainRow, oppWeights);
+  const w = weaknessWeights(mainRow, oppWeights, usage);
   let num = 0, den = 0;
   for (const [opp, wt] of Object.entries(w)) {
     num += wt * ((subRow[opp] ?? subMean) - subMean);
@@ -104,6 +117,21 @@ function availableMonths(csvText) {
   const lines = csvText.trim().split('\n');
   for (let i = 1; i < lines.length; i++) months.add(lines[i].split(',', 1)[0]);
   return [...months].sort();
+}
+
+/* usage.csv (month,rank,char,play_rate) -> {char: avg play_rate} over the given
+   months at one rank (default 36 = Master, the broadest population). */
+function usageRates(csvText, months, rank = 36) {
+  const monthSet = new Set(months);
+  const acc = {};
+  const lines = csvText.trim().split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    const [month, r, char, pr] = lines[i].split(',');
+    if (r === String(rank) && monthSet.has(month)) (acc[char] ??= []).push(parseFloat(pr));
+  }
+  const out = {};
+  for (const [c, arr] of Object.entries(acc)) out[c] = arr.reduce((s, x) => s + x, 0) / arr.length;
+  return out;
 }
 
 /* {opp: tier-combined score} — mirrors analyze.combined_row */
@@ -159,7 +187,7 @@ function charTable(idx, char, mw, exclude, tierWeights, patchMonth) {
 }
 
 /* mirrors recommend.py main loop; rows sorted by cover descending */
-function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
+function subTable(idx, char, mw, exclude, tierWeights, oppWeights, usage) {
   const mainRow = combinedRow(idx, char, mw, exclude, tierWeights);
   const worst3 = Object.keys(mainRow).sort((a, b) => mainRow[a] - mainRow[b]).slice(0, 3);
   const results = [];
@@ -169,13 +197,13 @@ function subTable(idx, char, mw, exclude, tierWeights, oppWeights) {
     if (!Object.keys(row).length) continue;
     const perTier = {};
     for (const r of Object.keys(tierWeights))
-      perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]), oppWeights);
+      perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]), oppWeights, usage);
     const w3 = worst3.filter(o => o in row).map(o => row[o]);
     results.push({
       sub,
-      cover: coverage(mainRow, row, oppWeights),
+      cover: coverage(mainRow, row, oppWeights, usage),
       c36: perTier['36'], c40: perTier['40'], c41: perTier['41'], c42: perTier['42'],
-      spec: specialization(mainRow, row, oppWeights),
+      spec: specialization(mainRow, row, oppWeights, usage),
       strength: strength(row),
       w3win: w3.length ? w3.reduce((s, v) => s + v, 0) / w3.length * 10 : null,
       corr: correlation(mainRow, row),
@@ -190,6 +218,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     PATCH_MONTH, DEFAULT_TIER_WEIGHTS, RANK_NAMES, TARGET_INJECT,
     monthWeights, wavg, coverage, specialization, strength, correlation, sharedWeaknesses,
-    buildIndex, availableMonths, combinedRow, charTable, subTable,
+    usageWeights, usageRates, buildIndex, availableMonths, combinedRow, charTable, subTable,
   };
 }
