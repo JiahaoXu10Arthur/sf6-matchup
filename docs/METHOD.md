@@ -67,18 +67,20 @@ keep resolving. Each character faces the other 29.
 ## 3. Rank tiers and skill-depth weights
 
 kakuhanapp provides matchup data for four ranks: 36 (Master), 40 (High Master),
-41 (Grand Master), and 42 (Ultimate Master). This pipeline uses **all four**,
-combined with default weights **0.5 : 1 : 2 : 3** (Master : HighM : GrandM : UltM),
-i.e. **Ultimate Master is weighted most and Master least**. All four weights are
-continuously adjustable in the web app (tier-weight sliders).
+41 (Grand Master), and 42 (Ultimate Master). The pipeline supports all four,
+combined with default weights **0 : 1 : 2 : 3** (Master : HighM : GrandM : UltM),
+i.e. **Master is excluded by default and Ultimate Master weighted most**. All four
+weights are continuously adjustable in the web app (tier-weight sliders), so Master
+can be dialed back in.
 
 The rationale is *skill depth*, not sample size: the higher the rank, the deeper
 the players' understanding of the game, and the closer their matchup outcomes
 sit to the matchup's "true" character-vs-character value rather than to
 execution errors or gaps in matchup knowledge. Weighting Ultimate Master highest
 therefore privileges the most informed signal; Master (the entry bracket, largest
-population but lowest skill of the four) gets the lightest default weight — it
-adds breadth without dominating the combined score.
+population but lowest skill of the four) is excluded from the combined score by
+default (weight 0), and can be added back via its slider when broader breadth is
+wanted.
 
 This is a deliberate **bias/variance trade-off, made in favor of bias**. The
 trade is real and runs against pure variance-minimization: Ultimate Master has
@@ -151,10 +153,11 @@ For each (character, opponent) pair, the pipeline computes:
 
 1. **Per-rank monthly average**: for each of the four tiers, a weighted
    average over the requested months using the active weight profile.
-2. **Tier-combined score**: the 0.5:1:2:3 weighted average over whichever tiers
+2. **Tier-combined score**: the 0:1:2:3 weighted average over whichever tiers
    have a non-null monthly average. If a tier has no data for the requested
    months it is simply omitted from the denominator rather than contributing
-   zero.
+   zero; an opponent whose only present tiers carry zero weight is dropped
+   entirely (no weighted data to combine).
 3. **Spread flag ⚠**: emitted when the maximum spread across available tier
    scores exceeds 0.25, indicating the matchup assessment diverges meaningfully
    across skill levels.

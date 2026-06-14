@@ -3,7 +3,7 @@
    functions match the Python originals. Keep formulas in sync with METHOD.md. */
 
 const PATCH_MONTH = '202603'; // major all-character balance patch, 2026-03-17
-const DEFAULT_TIER_WEIGHTS = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
+const DEFAULT_TIER_WEIGHTS = { 36: 0, 40: 1, 41: 2, 42: 3 };
 const RANK_NAMES = { 36: 'Master', 40: 'HighM', 41: 'GrandM', 42: 'UltM' };
 const TARGET_INJECT = 0.25;   // weight a targeted (u>1) non-weakness as a 4.5 matchup; keep in sync with scoring.py
 

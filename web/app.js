@@ -7,7 +7,7 @@ const state = {
   rank: 'comb',
   preset: 'current',
   monthW: {},
-  tierW: { 36: 0.5, 40: 1, 41: 2, 42: 3 },
+  tierW: { 36: 0, 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
   usageW: {},             // per-opponent usage-weight override (sparse; absent = auto from play rate)
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
@@ -19,7 +19,7 @@ let months = [];
 let usageCsv = '';
 
 const $ = sel => document.querySelector(sel);
-const DEFAULT_TIER = { 36: 0.5, 40: 1, 41: 2, 42: 3 };
+const DEFAULT_TIER = { 36: 0, 40: 1, 41: 2, 42: 3 };
 const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
 const BAR_HALF = 0.6;     // matchup bar full deflection at |score - 5| = 0.6 (bars view)
 

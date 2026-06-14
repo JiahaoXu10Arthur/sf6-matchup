@@ -38,9 +38,9 @@ def combined_row(char, months, mw, exclude, ranks=None):
     for opp, byrank in load(char, months, exclude).items():
         present = {r: v for r in ranks
                    if (v := wavg(byrank.get(r, {}), mw)) is not None}
-        if present:
-            out[opp] = (sum(v * TIER_WEIGHTS[r] for r, v in present.items())
-                        / sum(TIER_WEIGHTS[r] for r in present))
+        den = sum(TIER_WEIGHTS[r] for r in present)
+        if den:  # skip opps whose present ranks all have weight 0 (mirrors scoring.js)
+            out[opp] = sum(v * TIER_WEIGHTS[r] for r, v in present.items()) / den
     return out
 
 
@@ -57,10 +57,10 @@ def char_table(char, months, mw, exclude):
     for opp, byrank in data.items():
         tier = {r: wavg(byrank.get(r, {}), mw) for r in TIER_WEIGHTS}
         present = {r: v for r, v in tier.items() if v is not None}
-        if not present:
+        den = sum(TIER_WEIGHTS[r] for r in present)
+        if not den:  # no present rank carries weight (mirrors scoring.js `if (!den) continue`)
             continue
-        comb = (sum(v * TIER_WEIGHTS[r] for r, v in present.items())
-                / sum(TIER_WEIGHTS[r] for r in present))
+        comb = sum(v * TIER_WEIGHTS[r] for r, v in present.items()) / den
         spread = max(present.values()) - min(present.values())
         g = byrank.get(41, {})
         pre = [v for m, v in g.items() if m < PATCH_MONTH]
