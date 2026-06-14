@@ -44,7 +44,8 @@ Prebuilt offline files are attached to each
 
 | Version | Highlights |
 |---------|-----------|
-| **v1.2.0** (latest) | Official **Capcom Buckler API** data source (official names: M. BISON, AKUMA, …); **usage-based** default opponent weights; legacy kakuhanapp scripts removed |
+| **v1.3.0** (latest) | Per-matchup **confidence dots** (●●●/●●○/●○○); **usage × win-rate scatter** view (Smogon-style quadrants, point size = polarization); sub-finder **"Best duo"** pair-coverage + coverage-% reframe; directly-editable month & per-opponent usage weights |
+| v1.2.0 | Official **Capcom Buckler API** data source (official names: M. BISON, AKUMA, …); **usage-based** default opponent weights; legacy kakuhanapp scripts removed |
 | v1.1.0 | **SPEC** (specialization) + **STR** columns in the sub finder, sortable; bar-view UI fixes |
 | v1.0.0 | First offline standalone builds (bar view + tier list) |
 
