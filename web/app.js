@@ -418,7 +418,7 @@ function wireControls() {
 
 /* ---------- tier rendering ---------- */
 
-const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter' };
+const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter', threats: 'labelThreats' };
 
 function render() {
   closeCharCard();
@@ -427,6 +427,7 @@ function render() {
   if (state.view === 'match') renderMatch();
   else if (state.view === 'bars') renderBars();
   else if (state.view === 'scatter') renderScatter();
+  else if (state.view === 'threats') renderThreats();
   else renderSubs();
 }
 
@@ -547,56 +548,33 @@ function renderBars() {
 
 const winCls = w => w >= 50.1 ? 't-adv' : w <= 49.9 ? 't-dis' : 't-even';
 
-function renderScatter() {
-  $('#reliab-legend').hidden = true;
-  const ex = exclude();
-  const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
-
-  const pts = [];
-  for (const c of Object.keys(idx)) {
-    if (ex.has(c)) continue;
-    const row = combinedRow(idx, c, state.monthW, ex, state.tierW);
-    if (!Object.keys(row).length || rates[c] == null) continue;
-    pts.push({ char: c, usage: rates[c], win: strength(row) * 10, pol: polarization(row) });
-  }
-
-  $('#hero-summary').innerHTML = '';
-  $('#caption').innerHTML = t('scatterCaption');
-
-  if (pts.length < 2) {
-    $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`;
-    return;
-  }
-
+// shared scatter renderer. pts = [{char, x, y, size(0..1), cls, title}];
+// cfg = {axisX, axisY, aria, quadTR, quadTL, quadBR, quadBL} (all i18n keys).
+function buildScatter(pts, cfg) {
   const W = 860, H = 560, m = { l: 70, r: 28, t: 44, b: 58 };
-  const xs = pts.map(p => p.usage), ys = pts.map(p => p.win);
-  const xmax = Math.max(...xs) * 1.08;
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const xmax = Math.max(...xs) * 1.08 || 1;
   const pad = 0.18;
   const ymin = Math.min(...ys) - pad, ymax = Math.max(...ys) + pad;
   const px = u => m.l + u / xmax * (W - m.l - m.r);
   const py = w => H - m.b - (w - ymin) / (ymax - ymin) * (H - m.t - m.b);
-  const sorted = [...xs].sort((a, b) => a - b);
-  const medUsage = sorted[Math.floor(sorted.length / 2)];
-
-  const xMid = px(medUsage), yMid = py(50);
+  const sortedX = [...xs].sort((a, b) => a - b);
+  const xMid = px(sortedX[Math.floor(sortedX.length / 2)]), yMid = py(50);
   const x0 = px(0), x1 = px(xmax), yTop = py(ymax), yBot = py(ymin);
+  const within = yMid > yTop && yMid < yBot;   // is the 50% line in view?
 
-  // quadrant background tints (only when the 50% line is within view)
-  const quads = (yMid > yTop && yMid < yBot) ? `
+  const quads = within ? `
     <rect x="${xMid}" y="${yTop}" width="${x1 - xMid}" height="${yMid - yTop}" class="quad q-pop"/>
     <rect x="${x0}" y="${yTop}" width="${xMid - x0}" height="${yMid - yTop}" class="quad q-sleep"/>
     <rect x="${xMid}" y="${yMid}" width="${x1 - xMid}" height="${yBot - yMid}" class="quad q-over"/>
     <rect x="${x0}" y="${yMid}" width="${xMid - x0}" height="${yBot - yMid}" class="quad q-rare"/>` : '';
+  const ql = (key, x, y, anchor) => `<text class="quad-label" x="${x}" y="${y}" text-anchor="${anchor}">${t(key)}</text>`;
+  const quadLabels = within ? `
+    ${ql(cfg.quadTR, x1 - 8, yTop + 18, 'end')}
+    ${ql(cfg.quadTL, x0 + 8, yTop + 18, 'start')}
+    ${ql(cfg.quadBR, x1 - 8, yBot - 10, 'end')}
+    ${ql(cfg.quadBL, x0 + 8, yBot - 10, 'start')}` : '';
 
-  const quadLabel = (key, x, y, anchor) =>
-    `<text class="quad-label" x="${x}" y="${y}" text-anchor="${anchor}">${t(key)}</text>`;
-  const quadLabels = (yMid > yTop && yMid < yBot) ? `
-    ${quadLabel('quadStrongPop', x1 - 8, yTop + 18, 'end')}
-    ${quadLabel('quadSleeper', x0 + 8, yTop + 18, 'start')}
-    ${quadLabel('quadOverrated', x1 - 8, yBot - 10, 'end')}
-    ${quadLabel('quadWeakRare', x0 + 8, yBot - 10, 'start')}` : '';
-
-  // axis ticks
   let xticks = '';
   for (let u = 0; u <= xmax; u += 2) {
     xticks += `<line class="grid" x1="${px(u)}" y1="${yTop}" x2="${px(u)}" y2="${yBot}"/>
@@ -609,17 +587,13 @@ function renderScatter() {
       <text class="tick" x="${x0 - 10}" y="${py(w) + 4}" text-anchor="end">${w.toFixed(1)}</text>`;
   }
 
-  // point radius encodes polarization (matchup-row std): bigger = feast-or-famine.
-  const pols = pts.map(p => p.pol), polMax = Math.max(...pols, 0.01);
   const R_MIN = 4, R_MAX = 9;
-  const radius = pol => R_MIN + pol / polMax * (R_MAX - R_MIN);
-
   const dots = pts.map(p => {
     const sel = p.char === state.char;
-    const cx = px(p.usage), cy = py(p.win), r = radius(p.pol);
-    const title = `${cn(p.char)} · ${p.usage.toFixed(1)}% used · ${p.win.toFixed(2)}% win · ${t('polLabel')} ${p.pol.toFixed(2)}`;
-    return `<g class="pt ${winCls(p.win)} ${sel ? 'sel' : ''}" data-char="${p.char}">
-      <title>${title}</title>
+    const cx = px(p.x), cy = py(p.y);
+    const r = R_MIN + Math.max(0, Math.min(1, p.size)) * (R_MAX - R_MIN);
+    return `<g class="pt ${p.cls} ${sel ? 'sel' : ''}" data-char="${p.char}">
+      <title>${p.title}</title>
       <circle cx="${cx}" cy="${cy}" r="${sel ? r + 2 : r}"/>
       <text class="pt-label" x="${cx + r + 3}" y="${cy + 3.5}">${cn(p.char)}</text>
     </g>`;
@@ -627,7 +601,7 @@ function renderScatter() {
 
   $('#lanes').innerHTML = `
     <div class="scatter-wrap">
-      <svg class="scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('labelScatter')}" preserveAspectRatio="xMidYMid meet">
+      <svg class="scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="${t(cfg.aria)}" preserveAspectRatio="xMidYMid meet">
         ${quads}
         ${xticks}${yticks}
         <line class="axis-ref" x1="${x0}" y1="${yMid}" x2="${x1}" y2="${yMid}"/>
@@ -635,14 +609,67 @@ function renderScatter() {
         <line class="axis" x1="${x0}" y1="${yBot}" x2="${x1}" y2="${yBot}"/>
         <line class="axis" x1="${x0}" y1="${yTop}" x2="${x0}" y2="${yBot}"/>
         ${quadLabels}
-        <text class="axis-title" x="${(x0 + x1) / 2}" y="${H - 10}" text-anchor="middle">${t('scatterAxisUsage')}</text>
-        <text class="axis-title" transform="rotate(-90 16 ${(yTop + yBot) / 2})" x="16" y="${(yTop + yBot) / 2}" text-anchor="middle">${t('scatterAxisWin')}</text>
+        <text class="axis-title" x="${(x0 + x1) / 2}" y="${H - 10}" text-anchor="middle">${t(cfg.axisX)}</text>
+        <text class="axis-title" transform="rotate(-90 16 ${(yTop + yBot) / 2})" x="16" y="${(yTop + yBot) / 2}" text-anchor="middle">${t(cfg.axisY)}</text>
         ${dots}
       </svg>
     </div>`;
 
   $('#lanes').querySelectorAll('.pt').forEach(g =>
     g.addEventListener('click', () => openCharCard(g.dataset.char, g)));
+}
+
+function renderScatter() {
+  $('#reliab-legend').hidden = true;
+  const ex = exclude();
+  const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
+  const raw = [];
+  for (const c of Object.keys(idx)) {
+    if (ex.has(c)) continue;
+    const row = combinedRow(idx, c, state.monthW, ex, state.tierW);
+    if (!Object.keys(row).length || rates[c] == null) continue;
+    raw.push({ char: c, usage: rates[c], win: strength(row) * 10, pol: polarization(row) });
+  }
+  $('#hero-summary').innerHTML = '';
+  $('#caption').innerHTML = t('scatterCaption');
+  if (raw.length < 2) { $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`; return; }
+  const polMax = Math.max(...raw.map(p => p.pol), 0.01);
+  const pts = raw.map(p => ({
+    char: p.char, x: p.usage, y: p.win, size: p.pol / polMax, cls: winCls(p.win),
+    title: `${cn(p.char)} · ${p.usage.toFixed(1)}% used · ${p.win.toFixed(2)}% win · ${t('polLabel')} ${p.pol.toFixed(2)}`,
+  }));
+  buildScatter(pts, {
+    axisX: 'scatterAxisUsage', axisY: 'scatterAxisWin', aria: 'labelScatter',
+    quadTR: 'quadStrongPop', quadTL: 'quadSleeper', quadBR: 'quadOverrated', quadBL: 'quadWeakRare',
+  });
+}
+
+// per-character "threat map": one point per opponent — x = how often you face
+// them (usage), y = your win-rate vs them. Lower-right (common & you lose) is
+// the drill list; dot size = data confidence (reliability).
+function renderThreats() {
+  $('#reliab-legend').hidden = true;
+  const ex = exclude();
+  const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
+  const table = charTable(idx, state.char, state.monthW, ex, state.tierW, PATCH_MONTH);
+  const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
+  const pts = [];
+  for (const r of table) {
+    const v = metric(r);
+    if (v == null || rates[r.opp] == null) continue;
+    const win = v * 10, rel = reliability(r.nmo, r.nranks, r.spread).score;
+    pts.push({
+      char: r.opp, x: rates[r.opp], y: win, size: rel, cls: winCls(win),
+      title: `${cn(r.opp)} · ${rates[r.opp].toFixed(1)}% ${t('threatFaced')} · ${win.toFixed(2)}% ${t('ccWin')}`,
+    });
+  }
+  $('#hero-summary').innerHTML = '';
+  $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) });
+  if (pts.length < 2) { $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`; return; }
+  buildScatter(pts, {
+    axisX: 'threatAxisUsage', axisY: 'threatAxisWin', aria: 'labelThreats',
+    quadTR: 'quadComfort', quadTL: 'quadFree', quadBR: 'quadPriority', quadBL: 'quadMinor',
+  });
 }
 
 const strCls = s => s >= 5.05 ? 't-adv' : s <= 4.95 ? 't-dis' : '';
