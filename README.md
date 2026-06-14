@@ -34,7 +34,7 @@ One app, five view tabs over the same data and logic, at
 |------|-------------|
 | **Matchups** (tiers) | Bold esports tier-band layout (favourability lanes) with per-matchup confidence dots |
 | **Bars** | Dark "training-mode" diverging-bar table |
-| **Sub finder** | Best secondary characters to cover your worst matchups |
+| **Sub Recommend** | Best secondary characters to cover your worst matchups |
 | **Usage × Win** | Smogon-style cast-wide usage vs win-rate scatter (point size = polarization) |
 | **Matchup map** | Per-character scatter — each opponent plotted by encounter frequency vs your win rate; lower-right (common · losing) is the practice priority |
 
@@ -239,7 +239,7 @@ uses), with a 90% credible interval per matchup.
 
 ```bash
 python3 -m http.server 8741        # from the repository root
-# App: http://localhost:8741/web/   (Matchups · Bars · Sub finder · Usage × Win · Matchup map)
+# App: http://localhost:8741/web/   (Matchups · Bars · Sub Recommend · Usage × Win · Matchup map)
 ```
 
 The app recalculates instantly in the browser from `output/matrix.csv`:
