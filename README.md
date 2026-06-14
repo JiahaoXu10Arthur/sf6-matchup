@@ -4,7 +4,7 @@
 
 A reproducible pipeline and interactive web application for **Street Fighter 6**
 matchup analysis and complementary sub-character (pocket pick) recommendation,
-built on **Capcom Buckler's official battle-diagram API** (`dia_master`), with
+built on [**Capcom Buckler's official battle-diagram API**](https://www.streetfighter.com/6/buckler/) (`dia_master`), with
 official character names and usage-rate data.
 
 ---
@@ -41,7 +41,7 @@ One app, five view tabs over the same data and logic, at
 Clicking any character (chip, bar, or point) opens a detail card — win rate, usage,
 and its strongest/weakest matchups — with a button to jump to that character's page.
 
-> The older `/web-v2/` URL now redirects here. GitHub Pages and Google Fonts are
+> GitHub Pages and Google Fonts are
 > blocked in mainland China; for offline or in-China sharing, use the
 > self-contained file in [`standalone/`](#offline-standalone-build).
 
@@ -91,13 +91,16 @@ sf6-matchup/
 │   ├── build_matrix_buckler.py  # data/buckler/*.json → output/matrix.csv + usage.csv
 │   ├── analyze.py               # per-character matchup table CLI
 │   ├── recommend.py             # complementary sub recommendation CLI
-│   └── build_standalone.py      # bundles the web app into offline single-file HTML
+│   ├── build_standalone.py      # bundles the web app into offline single-file HTML
+│   ├── bayes.py                 # personal scout: pure Beta-Binomial statistics
+│   ├── personal_scout.py        # personal scout: classify your record vs the baseline (CLI)
+│   └── fetch_battlelog.py       # personal scout: Playwright battlelog fetch + pure parser
 ├── web/                     # the app — five view tabs (index.html, style.css, app.js, scoring.js, i18n.js, img/)
-├── web-v2/                  # redirect stub → ../web/ (kept so old links resolve)
 ├── standalone/              # generated offline single-file build
 ├── tests/                   # pytest suite incl. Python↔JS parity
-├── docs/                    # METHOD.md (methodology), plan.md
+├── docs/                    # METHOD.md / METHOD.zh-CN.md (methodology), plan.md
 ├── data/buckler/            # raw Buckler JSON cache (gitignored)
+├── data/personal/           # personal scout: your session + battlelog (gitignored)
 └── output/matrix.csv        # long-format matchup matrix
 ```
 
@@ -105,7 +108,7 @@ sf6-matchup/
 
 ### Score scale
 
-Scores follow the Buckler convention of win-rate ÷ 10, centred at 5.0
+Scores follow the [Buckler](https://www.streetfighter.com/6/buckler/) convention of win-rate ÷ 10, centred at 5.0
 (e.g. `5.237` = 52.37 % win rate). Favourability bands: ≥ 5.3 advantageous,
 ≥ 5.1 slightly favourable, ≥ 4.9 even, ≥ 4.7 slightly unfavourable, < 4.7
 disadvantageous.
@@ -213,6 +216,25 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 | `--weights` | Custom per-month weights, e.g. `202604=1,202605=1` | overrides `--profile` |
 | `--exclude` | Opponents/candidates to drop | `INGRID` |
 
+## Personal Matchup Scout (local, optional)
+
+Compare *your own* Buckler ranked record against the global baseline with
+Beta-Binomial shrinkage, so small-sample swings aren't mistaken for genuine
+weaknesses. It runs entirely on your machine and needs your Capcom login; your
+session and match data stay local (`data/personal/`, gitignored) and never commit.
+
+```bash
+pip install playwright && playwright install chromium
+python3 scripts/fetch_battlelog.py --cfn <your_short_id>   # one-time login, then pages your battlelog -> data/personal/<id>.csv
+python3 scripts/personal_scout.py  --cfn <your_short_id>   # -> output/<id>_scout.md
+```
+
+The analysis core (`scripts/bayes.py`, `scripts/personal_scout.py`) is pure
+standard library and parity-tested; Playwright is needed only for the fetch step.
+Each opponent is classed as *real weakness*, *overperforming*, *small sample*, or
+*on par* against the shared matchup baseline (the same `combined_row` the web app
+uses), with a 90% credible interval per matchup.
+
 ## Interactive web app
 
 ```bash
@@ -254,8 +276,7 @@ python3 -m pytest tests/ -v        # requires `node` for the JS parity tests
 ## Deployment (GitHub Pages)
 
 Push the repository and enable Pages on the `main` branch (root). The app is
-then served at `https://<user>.github.io/<repo>/web/` (the old `/web-v2/` URL
-redirects there).
+then served at `https://<user>.github.io/<repo>/web/`.
 
 ## Attribution and disclaimer
 

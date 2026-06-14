@@ -35,14 +35,13 @@ SF6 Matchup Lab 聚合大师及以上四个段位的逐月对局胜率数据，�
 点击任意角色（柱、点或卡片）即可展开详情卡 —— 胜率、使用率及其擅长/不利对位，
 并可一键跳转到该角色的页面。
 
-> 旧的 `/web-v2/` 链接现在会重定向到此处。中国大陆无法访问 GitHub Pages 与
-> Google Fonts；若需离线或在中国大陆分享，请使用
-> [`standalone/`](#离线单文件构建) 中的自包含文件。
+> 中国大陆无法访问 GitHub Pages 与 Google Fonts；若需离线或在中国大陆分享，
+> 请使用 [`standalone/`](#离线单文件构建) 中的自包含文件。
 
 ## 功能特性
 
 - **任意角色、任意时间区间** —— `--char`、`--months 202502-202605`（支持跨年）。
-- **四个段位** —— 大师 / 高阶 / 特级 / 究极大师，可单独查看，或按默认 0 : 1 : 2 : 3 段位深度权重综合（究极大师权重最高；大师默认排除，但可无级调回，详见[方法论](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)）。
+- **四个段位** —— 大师 / 高阶 / 特级 / 究极大师，可单独查看，或按默认 0 : 1 : 2 : 3 段位深度权重综合（究极大师权重最高；大师默认排除，但可无级调回，详见[方法论](docs/METHOD.zh-CN.md#3-rank-tiers-and-skill-depth-weights)）。
 - **版本感知的月份权重** —— `current`（补丁后）与 `all`（等权）预设，或完全自定义的逐月权重；
   同一套 `{月份: 权重}` 字典同时驱动网页滑块。
 - **逐对局可信度** —— 每个对局附带 ●●● / ●●○ / ●○○ 可信度标记，由数据月份数、段位覆盖与各段位一致程度推导（Buckler 未公开样本量）。
@@ -63,13 +62,16 @@ sf6-matchup/
 │   ├── build_matrix_buckler.py  # data/buckler/*.json → output/matrix.csv + usage.csv
 │   ├── analyze.py               # 单角色对局相性表命令行
 │   ├── recommend.py             # 互补副角推荐命令行
-│   └── build_standalone.py      # 将网页应用打包为离线单文件 HTML
+│   ├── build_standalone.py      # 将网页应用打包为离线单文件 HTML
+│   ├── bayes.py                 # 个人侦察：纯 Beta-Binomial 统计
+│   ├── personal_scout.py        # 个人侦察：将你的战绩与基线对比分类（命令行）
+│   └── fetch_battlelog.py       # 个人侦察：Playwright 战斗记录抓取 + 纯解析器
 ├── web/                     # 应用 —— 五个视图标签（index.html、style.css、app.js、scoring.js、i18n.js、img/）
-├── web-v2/                  # 重定向占位 → ../web/（保留以兼容旧链接）
 ├── standalone/              # 生成的离线单文件
 ├── tests/                   # pytest 测试，含 Python↔JS 一致性校验
-├── docs/                    # METHOD.md（方法论）、plan.md
+├── docs/                    # METHOD.md / METHOD.zh-CN.md（方法论）、plan.md
 ├── data/buckler/            # 原始 Buckler JSON 缓存（已 gitignore）
+├── data/personal/           # 个人侦察：你的会话与战斗记录（已 gitignore）
 └── output/matrix.csv        # 长格式对局矩阵
 ```
 
@@ -77,7 +79,7 @@ sf6-matchup/
 
 ### 分数刻度
 
-分数遵循 Buckler 约定，即胜率 ÷ 10、以 5.0 为中心（例如 `5.237` = 52.37% 胜率）。
+分数遵循 [Buckler](https://www.streetfighter.com/6/buckler/) 约定，即胜率 ÷ 10、以 5.0 为中心（例如 `5.237` = 52.37% 胜率）。
 优劣势分档：≥ 5.3 有利、≥ 5.1 微有利、≥ 4.9 五分、≥ 4.7 微不利、< 4.7 不利。
 
 ### 计算流程
@@ -117,7 +119,7 @@ COMB(O) = Σ_r  W_r · m̄(O, r)  /  Σ_r  W_r
 
 究极大师权重最高：段位越高、对游戏理解越深，其对局结果越接近角色对角色的「真实」
 相性值；大师（入门段位、人群最大但噪声最高）默认被排除，可按需调回。这是一个刻意偏向「偏差而非方差」的取舍 —— 究极大师人群最小、噪声最大，却
-赋予最高权重，换取最具理解力人群的判断；详见[方法论](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)。
+赋予最高权重，换取最具理解力人群的判断；详见[方法论](docs/METHOD.zh-CN.md#3-rank-tiers-and-skill-depth-weights)。
 单段位视图（`--profile` 选定某段位）直接使用 `m̄(O, r)`。另外单独报告每个对手的
 **Δpatch** 漂移 =（特级大师补丁后均值 − 补丁前均值）。
 
@@ -143,7 +145,7 @@ COVER = Σ w(O) · (副角对O − 5) / Σ w(O)
 - **w3win%（前3胜率）** —— 副角对本体最差三个对局的平均胜率。
 
 完整方法论 —— 段位权重依据、2026-03-17 平衡补丁、边界情形处理及已知局限 ——
-记录于 [`docs/METHOD.md`](docs/METHOD.md)（英文）。
+记录于 [`docs/METHOD.zh-CN.md`](docs/METHOD.zh-CN.md)（另有[英文版](docs/METHOD.md)）。
 
 ## 数据管线（命令行）
 
@@ -166,6 +168,22 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 | `--profile` | `current`（补丁后加权）或 `all`（等权） | `current` |
 | `--weights` | 自定义逐月权重，如 `202604=1,202605=1` | 覆盖 `--profile` |
 | `--exclude` | 要排除的对手/候选 | `INGRID` |
+
+## 个人对位侦察（本地，可选）
+
+用 Beta-Binomial 收缩把*你自己*的 Buckler 排位战绩与全局基线对比，使小样本的波动
+不被误判为真实弱点。它完全在你本机运行，需要你的 Capcom 登录；你的会话与对局数据
+保留在本地（`data/personal/`，已 gitignore），绝不提交。
+
+```bash
+pip install playwright && playwright install chromium
+python3 scripts/fetch_battlelog.py --cfn <你的 short_id>   # 一次性登录，随后翻页抓取战斗记录 -> data/personal/<id>.csv
+python3 scripts/personal_scout.py  --cfn <你的 short_id>   # -> output/<id>_scout.md
+```
+
+分析内核（`scripts/bayes.py`、`scripts/personal_scout.py`）是纯标准库且经一致性测试；
+仅抓取步骤需要 Playwright。每个对手会相对共享的对位基线（与网页应用同一套 `combined_row`）
+被归类为*真实弱点*、*超常发挥*、*小样本* 或 *持平*，并给出每个对位 90% 的可信区间。
 
 ## 交互式网页应用
 
@@ -204,10 +222,10 @@ python3 -m pytest tests/ -v        # JS 一致性测试需要 `node`
 ## 部署（GitHub Pages）
 
 推送仓库并在 `main` 分支（根目录）启用 Pages，应用即可在
-`https://<user>.github.io/<repo>/web/` 访问（旧的 `/web-v2/` 链接会重定向至此）。
+`https://<user>.github.io/<repo>/web/` 访问。
 
 ## 致谢与免责声明
 
 对局与使用率数据来源于 Capcom《街头霸王 6》官方 Buckler 对战相性图
 （streetfighter.com/6/buckler）。本项目为非官方的爱好者分析工具，与 Capcom 无任何关联，亦未获其认可。
-数据来源未公开样本量；由此产生的统计注意事项见 `docs/METHOD.md`。
+数据来源未公开样本量；由此产生的统计注意事项见 `docs/METHOD.zh-CN.md`。

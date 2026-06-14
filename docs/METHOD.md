@@ -1,8 +1,10 @@
 # SF6 Matchup Pipeline — Methodology
 
+**English** | [简体中文](METHOD.zh-CN.md)
+
 ## 1. Data source
 
-Matchup scores are drawn directly from **Capcom's official Buckler API**:
+Matchup scores are drawn directly from [**Capcom's official Buckler API**](https://www.streetfighter.com/6/buckler/):
 
     https://www.streetfighter.com/6/buckler/api/{lang}/stats/dia_master/{YYYYMM}
     https://www.streetfighter.com/6/buckler/api/{lang}/stats/usagerate_master/{YYYYMM}
@@ -18,7 +20,7 @@ aligned by id (`_oid` → header `id`), not array position. `usagerate_master`
 gives per-character play rates per bracket.
 
 Each matchup score is a win-rate on a 5.0-centered scale: `5.237` = 52.37% win
-rate for the displayed character against that opponent. Buckler's tier legend:
+rate for the displayed character against that opponent. [Buckler's](https://www.streetfighter.com/6/buckler/) tier legend:
 
 | Score | Label |
 |-------|-------|
@@ -66,7 +68,7 @@ keep resolving. Each character faces the other 29.
 
 ## 3. Rank tiers and skill-depth weights
 
-kakuhanapp provides matchup data for four ranks: 36 (Master), 40 (High Master),
+[Buckler](https://www.streetfighter.com/6/buckler/) provides matchup data for four ranks: 36 (Master), 40 (High Master),
 41 (Grand Master), and 42 (Ultimate Master). The pipeline supports all four,
 combined with default weights **0 : 1 : 2 : 3** (Master : HighM : GrandM : UltM),
 i.e. **Master is excluded by default and Ultimate Master weighted most**. All four
@@ -88,9 +90,9 @@ the smallest player pool and the highest month-to-month variance (empirically
 ~2× High Master's), yet receives the largest weight — the opposite of what
 inverse-variance weighting would do. We accept the extra noise to track the most
 skilled population's read on each matchup. The spread flag (§6.3) surfaces cases
-where the tiers disagree enough that this noise matters. The site does not
-publish match-count sample sizes (the 件 counts on the page are forum-post
-counts), so true inverse-variance weighting is not available regardless.
+where the tiers disagree enough that this noise matters. Buckler does not
+publish match-count sample sizes, so true inverse-variance weighting is not
+available regardless.
 
 ## 4. Balance timeline and the month archive
 
@@ -110,7 +112,7 @@ decisions:
 ALEX was released with the March patch and therefore has data starting from
 202603. INGRID has data only in 202605.
 
-kakuhanapp returns HTTP 500 for (character, month) combinations that predate a
+Buckler returns HTTP 500 for (character, month) combinations that predate a
 character's release. The downloader treats persistent HTTP errors as
 no-data events and writes empty marker files, keeping re-runs idempotent. Over
 the full 16-month archive 136 such empty files exist — DLC characters before
@@ -321,10 +323,9 @@ rather than any single tier's perspective.
 
 ## 10. Limitations
 
-- **No sample sizes.** The 件 figures visible on kakuhanapp pages are
-  forum-post counts, not match counts. No sample-size or inverse-variance
-  weighting is possible; the 0.5:1:2:3 tier weighting is a deliberate skill-depth
-  choice (§3), not a data-volume estimate.
+- **No sample sizes.** Buckler publishes no per-matchup match counts. No
+  sample-size or inverse-variance weighting is possible; the 0:1:2:3 tier
+  weighting is a deliberate skill-depth choice (§3), not a data-volume estimate.
 - **INGRID data is minimal.** INGRID was released on 2026-05-27. The 202605
   matchup data covers only a few days of matches and is highly unstable. INGRID
   is excluded by default; re-including her (`--exclude` without INGRID) should
@@ -333,7 +334,7 @@ rather than any single tier's perspective.
   roughly in half. The `current` profile assigns it weight 0.5 as a compromise;
   no intra-month separation is available from the data source.
 - **Ultimate Master noise.** UltM has the smallest player population and
-  therefore the highest variance, yet the 0.5:1:2:3 scheme weights it *most* (§3) —
+  therefore the highest variance, yet the 0:1:2:3 scheme weights it *most* (§3) —
   a deliberate bias toward the most skilled population at the cost of higher
   variance. Outlier scores at UltM are correspondingly amplified; the spread
   warning (§6.3) flags matchups where the tiers disagree enough for this to
