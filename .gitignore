@@ -9,3 +9,6 @@ data/personal/
 
 # agent/session state — not project content
 .claude/
+
+# personal scout reports stay local
+output/*_scout.md
