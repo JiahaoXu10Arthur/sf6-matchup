@@ -37,6 +37,17 @@ Two interchangeable front-end designs share the same data and logic:
 > GitHub Pages and Google Fonts are blocked in mainland China. For offline or
 > in-China sharing, use the self-contained files in [`standalone/`](#offline-standalone-build).
 
+## Releases
+
+Prebuilt offline files are attached to each
+[GitHub release](https://github.com/JiahaoXu10Arthur/sf6-matchup/releases).
+
+| Version | Highlights |
+|---------|-----------|
+| **v1.2.0** (latest) | Official **Capcom Buckler API** data source (official names: M. BISON, AKUMA, …); **usage-based** default opponent weights; legacy kakuhanapp scripts removed |
+| v1.1.0 | **SPEC** (specialization) + **STR** columns in the sub finder, sortable; bar-view UI fixes |
+| v1.0.0 | First offline standalone builds (bar view + tier list) |
+
 ## Features
 
 - **Any character, any time range** — `--char`, `--months 202502-202605` (cross-year supported).
@@ -53,20 +64,19 @@ Two interchangeable front-end designs share the same data and logic:
 ```text
 sf6-matchup/
 ├── scripts/
-│   ├── roster.py            # character roster, rank/tier constants, patch month
-│   ├── parse.py             # HTML → {opponent: score}
-│   ├── scoring.py           # pure math: weights, coverage, correlation
-│   ├── download.py          # idempotent page downloader
-│   ├── build_matrix.py      # data/*.html → output/matrix.csv (+ anti-symmetry check)
-│   ├── analyze.py           # per-character matchup table CLI
-│   ├── recommend.py         # complementary sub recommendation CLI
-│   └── build_standalone.py  # bundles the web app into offline single-file HTML
+│   ├── roster.py                # character roster, rank/tier constants, patch month
+│   ├── scoring.py               # pure math: weights, coverage, specialization, usage
+│   ├── download_buckler.py      # idempotent Buckler JSON downloader (dia_master + usage)
+│   ├── build_matrix_buckler.py  # data/buckler/*.json → output/matrix.csv + usage.csv
+│   ├── analyze.py               # per-character matchup table CLI
+│   ├── recommend.py             # complementary sub recommendation CLI
+│   └── build_standalone.py      # bundles the web app into offline single-file HTML
 ├── web/                     # v1 — dark bar-view UI (index.html, style.css, app.js, scoring.js, i18n.js)
 ├── web-v2/                  # v2 — tier-list UI (reuses ../web scoring.js + i18n.js)
 ├── standalone/              # generated offline single-file builds
 ├── tests/                   # pytest suite incl. Python↔JS parity
 ├── docs/                    # METHOD.md (methodology), plan.md
-├── data/                    # raw HTML cache (gitignored)
+├── data/buckler/            # raw Buckler JSON cache (gitignored)
 └── output/matrix.csv        # long-format matchup matrix
 ```
 
@@ -171,9 +181,6 @@ python3 build_matrix_buckler.py                          # data/buckler/ → out
 python3 analyze.py   --char TERRY --months 202502-202605 --profile current
 python3 recommend.py --char TERRY --months 202502-202605 --profile current
 ```
-
-> `download.py` / `build_matrix.py` (kakuhanapp mirror) remain as legacy but are
-> superseded by the official Buckler downloader above.
 
 ### Parameters
 

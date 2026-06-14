@@ -45,20 +45,19 @@ SF6 Matchup Lab 聚合大师及以上四个段位的逐月对局胜率数据，�
 ```text
 sf6-matchup/
 ├── scripts/
-│   ├── roster.py            # 角色名单、段位/权重常量、补丁月份
-│   ├── parse.py             # HTML → {对手: 分数}
-│   ├── scoring.py           # 纯计算：权重、补强分、相关性
-│   ├── download.py          # 幂等的页面下载器
-│   ├── build_matrix.py      # data/*.html → output/matrix.csv（含反对称校验）
-│   ├── analyze.py           # 单角色对局相性表命令行
-│   ├── recommend.py         # 互补副角推荐命令行
-│   └── build_standalone.py  # 将网页应用打包为离线单文件 HTML
+│   ├── roster.py                # 角色名单、段位/权重常量、补丁月份
+│   ├── scoring.py               # 纯计算：权重、补强分、专精、使用率
+│   ├── download_buckler.py      # 幂等的 Buckler JSON 下载器（dia_master + 使用率）
+│   ├── build_matrix_buckler.py  # data/buckler/*.json → output/matrix.csv + usage.csv
+│   ├── analyze.py               # 单角色对局相性表命令行
+│   ├── recommend.py             # 互补副角推荐命令行
+│   └── build_standalone.py      # 将网页应用打包为离线单文件 HTML
 ├── web/                     # v1 —— 深色柱状图界面
 ├── web-v2/                  # v2 —— 段位列表界面（复用 ../web 的 scoring.js 与 i18n.js）
 ├── standalone/              # 生成的离线单文件
 ├── tests/                   # pytest 测试，含 Python↔JS 一致性校验
 ├── docs/                    # METHOD.md（方法论）、plan.md
-├── data/                    # 原始 HTML 缓存（已 gitignore）
+├── data/buckler/            # 原始 Buckler JSON 缓存（已 gitignore）
 └── output/matrix.csv        # 长格式对局矩阵
 ```
 

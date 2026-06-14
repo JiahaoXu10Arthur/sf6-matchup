@@ -29,8 +29,8 @@ rate for the displayed character against that opponent. Buckler's tier legend:
 | < 4.7 | Disadvantage |
 
 **Why official Buckler over a mirror?** The project originally mirrored
-kakuhanapp.com (still present as legacy `download.py`/`build_matrix.py`), but the
-official API is strictly better: it's the source of truth, uses Capcom's
+kakuhanapp.com, but the official API is strictly better: it's the source of
+truth, uses Capcom's
 **official English names** (`M. BISON`, `AKUMA`, `E. HONDA`, …), has no DNS/bot
 flakiness, and the archive reaches back to ~SF6 launch (202306). The pipeline
 ingests 202502–202605 (16 months) by default; `matrix.csv` and the web app carry
