@@ -4,25 +4,30 @@ from collections import defaultdict
 from pathlib import Path
 
 from analyze import combined_row, fmt, resolve_weights
-from roster import NAME_BY_SLUG
+from roster import NAME_BY_SLUG, TIER_WEIGHTS
 from scoring import (correlation, coverage, expand_months, shared_weaknesses,
                      specialization, strength, usage_weights)
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load_usage_weights(months, rank=36):
-    """{char: sqrt(play_rate/mean)} over the given months at one rank, from
-    output/usage.csv. Returns {} if the file is absent."""
+def load_usage_weights(month_w, tier_w=TIER_WEIGHTS):
+    """{char: sqrt(rate/mean)} where rate is the tier- and month-weighted average
+    play-rate over the rank×month grid: Σ W_r·w_m·u / Σ W_r·w_m (over cells that
+    exist), using the same month + tier weights as the matchup scores. Returns {}
+    if usage.csv is absent. Mirrors scoring.js usageRates."""
     path = ROOT / 'output' / 'usage.csv'
     if not path.exists():
         return {}
-    rates = defaultdict(list)
+    num, den = defaultdict(float), defaultdict(float)
     with path.open() as fh:
         for row in csv.DictReader(fh):
-            if int(row['rank']) == rank and row['month'] in months:
-                rates[row['char']].append(float(row['play_rate']))
-    return usage_weights({c: sum(v) / len(v) for c, v in rates.items()})
+            w = month_w.get(row['month'], 0) * tier_w.get(int(row['rank']), 0)
+            if w <= 0:
+                continue
+            num[row['char']] += w * float(row['play_rate'])
+            den[row['char']] += w
+    return usage_weights({c: num[c] / den[c] for c in num if den[c] > 0})
 
 
 def main():
@@ -43,7 +48,7 @@ def main():
     worst3 = sorted(main_row, key=main_row.get)[:3]
     candidates = [n for n in NAME_BY_SLUG.values()
                   if n != args.char and n not in exclude]
-    usage = load_usage_weights(months)
+    usage = load_usage_weights(mw)
 
     results = []
     for sub in candidates:

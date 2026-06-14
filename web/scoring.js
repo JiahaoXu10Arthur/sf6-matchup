@@ -157,18 +157,21 @@ function availableMonths(csvText) {
   return [...months].sort();
 }
 
-/* usage.csv (month,rank,char,play_rate) -> {char: avg play_rate} over the given
-   months at one rank (default 36 = Master, the broadest population). */
-function usageRates(csvText, months, rank = 36) {
-  const monthSet = new Set(months);
-  const acc = {};
+/* usage.csv (month,rank,char,play_rate) -> {char: weighted avg play_rate} over
+   the rank×month grid: Σ W_r·w_m·u / Σ W_r·w_m (over cells that exist), using the
+   same month + tier weights as the matchup scores. Mirrors recommend.load_usage_weights. */
+function usageRates(csvText, monthW, tierWeights) {
+  const num = {}, den = {};
   const lines = csvText.trim().split('\n');
   for (let i = 1; i < lines.length; i++) {
     const [month, r, char, pr] = lines[i].split(',');
-    if (r === String(rank) && monthSet.has(month)) (acc[char] ??= []).push(parseFloat(pr));
+    const w = (monthW[month] ?? 0) * (tierWeights[r] ?? 0);
+    if (w <= 0) continue;
+    num[char] = (num[char] ?? 0) + w * parseFloat(pr);
+    den[char] = (den[char] ?? 0) + w;
   }
   const out = {};
-  for (const [c, arr] of Object.entries(acc)) out[c] = arr.reduce((s, x) => s + x, 0) / arr.length;
+  for (const c in num) if (den[c] > 0) out[c] = num[c] / den[c];
   return out;
 }
 

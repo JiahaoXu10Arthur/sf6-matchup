@@ -98,8 +98,7 @@ function exclude() { return new Set(Object.keys(state.oppW).filter(c => state.op
 // per-opponent manual overrides in state.usageW win over the auto play-rate value.
 function usageMap() {
   if (!state.useUsage || !usageCsv) return null;
-  const active = months.filter(m => (state.monthW[m] ?? 0) > 0);
-  return { ...usageWeights(usageRates(usageCsv, active, 36)), ...state.usageW };
+  return { ...usageWeights(usageRates(usageCsv, state.monthW, state.tierW)), ...state.usageW };
 }
 
 /* ---------- controls (shared shape with v1) ---------- */
@@ -481,8 +480,7 @@ const winCls = w => w >= 50.1 ? 't-adv' : w <= 49.9 ? 't-dis' : 't-even';
 function renderScatter() {
   $('#reliab-legend').hidden = true;
   const ex = exclude();
-  const active = months.filter(m => (state.monthW[m] ?? 0) > 0);
-  const rates = usageCsv ? usageRates(usageCsv, active, 36) : {};
+  const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
 
   const pts = [];
   for (const c of Object.keys(idx)) {

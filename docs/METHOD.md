@@ -231,12 +231,15 @@ as a stepper per opponent:
   matchup happens to be.
 
 `usage(O)` is a **popularity multiplier** (default on; toggle in the web app)
-that down-weights opponents few people play. It is `sqrt(play_rate(O) / mean)`
-from Buckler's `usagerate_master` data — averaged over the active months at
-Master (rank 36) — so an average-popularity opponent = 1.0, a popular one
-somewhat above (RYU ≈ 1.6), a rare one somewhat below (E. HONDA ≈ 0.55). The
-`sqrt` dampens it so a 9%-played character doesn't dwarf a 1% one 9×. This
-addresses the rare-character inflation: a sub that "covers" a barely-played
+that down-weights opponents few people play. It is `sqrt(play_rate(O) / mean)`,
+where `play_rate(O)` is the **tier- and month-weighted** average of Buckler's
+per-rank play-rate data over the rank×month grid — `Σ W_r·w_m·u(O,r,m) / Σ W_r·w_m`,
+using the *same* tier weights `W_r` and month weights `w_m` as the matchup scores.
+So popularity follows whatever rank/month focus you set: the broad ladder when
+weights are spread, your own bracket's current meta when they are concentrated.
+An average-popularity opponent = 1.0, a popular one somewhat above, a rare one
+below; the `sqrt` dampens it so a 9%-played character doesn't dwarf a 1% one 9×.
+This addresses rare-character inflation: a sub that "covers" a barely-played
 opponent earns less credit for it. With the toggle off, `usage(O) = 1` for all.
 
 **Specialization (SPEC) — strength-adjusted coverage**:
