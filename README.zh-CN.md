@@ -21,15 +21,19 @@ SF6 Matchup Lab 聚合大师及以上四个段位的逐月对局胜率数据，�
 
 ## 在线演示
 
-两套可互换的前端设计共享同一套数据与逻辑：
+同一应用、四个视图标签共享同一套数据与逻辑，访问
+<https://jiahaoxu10arthur.github.io/sf6-matchup/web/>：
 
-| 设计 | 说明 | 链接 |
-|------|------|------|
-| **柱状图视图**（v1） | 深色「训练模式」双向柱状表 | <https://jiahaoxu10arthur.github.io/sf6-matchup/web/> |
-| **段位列表**（v2） | 电竞风格的优劣势分层布局，逐对局可信度标记，以及使用率 × 胜率散点图 | <https://jiahaoxu10arthur.github.io/sf6-matchup/web-v2/> |
+| 视图 | 说明 |
+|------|------|
+| **相性表**（段位） | 电竞风格的优劣势分层布局，逐对局可信度标记 |
+| **柱状图** | 深色「训练模式」双向柱状表 |
+| **副角推荐** | 推荐最能弥补你弱势对局的副角色 |
+| **使用率 × 胜率** | Smogon 风格的使用率对胜率散点图（点大小 = 极化度） |
 
-> 中国大陆无法访问 GitHub Pages 与 Google Fonts。若需离线或在中国大陆分享，
-> 请使用 [`standalone/`](#离线单文件构建) 中的自包含文件。
+> 旧的 `/web-v2/` 链接现在会重定向到此处。中国大陆无法访问 GitHub Pages 与
+> Google Fonts；若需离线或在中国大陆分享，请使用
+> [`standalone/`](#离线单文件构建) 中的自包含文件。
 
 ## 功能特性
 
@@ -54,8 +58,8 @@ sf6-matchup/
 │   ├── analyze.py               # 单角色对局相性表命令行
 │   ├── recommend.py             # 互补副角推荐命令行
 │   └── build_standalone.py      # 将网页应用打包为离线单文件 HTML
-├── web/                     # v1 —— 深色柱状图界面
-├── web-v2/                  # v2 —— 段位列表界面（复用 ../web 的 scoring.js 与 i18n.js）
+├── web/                     # 应用 —— 四个视图标签（index.html、style.css、app.js、scoring.js、i18n.js、img/）
+├── web-v2/                  # 重定向占位 → ../web/（保留以兼容旧链接）
 ├── standalone/              # 生成的离线单文件
 ├── tests/                   # pytest 测试，含 Python↔JS 一致性校验
 ├── docs/                    # METHOD.md（方法论）、plan.md
@@ -161,14 +165,13 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 
 ```bash
 python3 -m http.server 8741        # 在仓库根目录运行
-# 柱状图视图：http://localhost:8741/web/
-# 段位列表：  http://localhost:8741/web-v2/
+# 应用：http://localhost:8741/web/   （相性表 · 柱状图 · 副角推荐 · 使用率 × 胜率）
 ```
 
-两种界面都在浏览器中基于 `output/matrix.csv` 即时重新计算：角色选择、
-分段位标签或段位加权综合（COMB）、实时月份与段位权重滑块、INGRID 开关、重置，
-以及副角推荐视图。`web/scoring.js` 中的计算逻辑是 `scripts/scoring.py` 的移植；
-`tests/test_js_parity.py` 验证两套实现的结果一致（误差 `1e-9` 以内）。
+应用在浏览器中基于 `output/matrix.csv` 即时重新计算：角色选择、
+分段位标签或段位加权综合（COMB）、可直接输入的月份与段位权重、逐对手使用率权重、
+INGRID 开关、重置，以及四个视图标签。`web/scoring.js` 中的计算逻辑是
+`scripts/scoring.py` 的移植；`tests/test_js_parity.py` 验证两套实现的结果一致（误差 `1e-9` 以内）。
 
 ## 离线单文件构建
 
@@ -179,10 +182,9 @@ python3 -m http.server 8741        # 在仓库根目录运行
 python3 scripts/build_standalone.py
 ```
 
-在 `standalone/` 中生成两份自包含文件，已内联数据集、代码与样式，并移除全部外部依赖：
+在 `standalone/` 中生成一份自包含文件，已内联数据集、代码与样式，并移除全部外部依赖：
 
-- `sf6-matchup-bars.html` —— v1 柱状图视图
-- `sf6-matchup-tierlist.html` —— v2 段位列表
+- `sf6-matchup.html` —— 完整应用（全部四个视图标签）
 
 双击即可运行 —— 无需联网、服务器或安装 —— 可通过邮件、即时通讯或 U 盘分享。
 自定义显示字体被省略（其依赖 Google Fonts），布局将回退到系统字体。
@@ -196,7 +198,7 @@ python3 -m pytest tests/ -v        # JS 一致性测试需要 `node`
 ## 部署（GitHub Pages）
 
 推送仓库并在 `main` 分支（根目录）启用 Pages，应用即可在
-`https://<user>.github.io/<repo>/web/` 与 `/web-v2/` 访问。
+`https://<user>.github.io/<repo>/web/` 访问（旧的 `/web-v2/` 链接会重定向至此）。
 
 ## 致谢与免责声明
 

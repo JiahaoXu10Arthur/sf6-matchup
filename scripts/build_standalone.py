@@ -45,10 +45,6 @@ def build(index_path, css_path, app_path, out_name):
     # drop the external script tags; we inline everything below
     html = re.sub(r'[ \t]*<script src="[^"]*"></script>\n?', '', html)
 
-    # rewrite cross-links so the two standalone files point at each other
-    html = html.replace('href="../web-v2/"', 'href="sf6-matchup-tierlist.html"')
-    html = html.replace('href="../web/"', 'href="sf6-matchup-bars.html"')
-
     bundle = (
         f'<script>var MATRIX_CSV = {json.dumps(CSV)};</script>\n'
         f'<script>var USAGE_CSV = {json.dumps(USAGE)};</script>\n'
@@ -66,15 +62,14 @@ def build(index_path, css_path, app_path, out_name):
 
 
 def main():
-    # remove stale earlier artifact names if present
-    for stale in ('sf6-matchup-light.html', 'sf6-matchup-dark.html'):
+    # remove stale earlier artifact names if present (v1/v2 were merged into one app)
+    for stale in ('sf6-matchup-light.html', 'sf6-matchup-dark.html',
+                  'sf6-matchup-bars.html', 'sf6-matchup-tierlist.html'):
         p = OUT / stale
         if p.exists():
             p.unlink()
     build(WEB / 'index.html', WEB / 'style.css', WEB / 'app.js',
-          'sf6-matchup-bars.html')
-    build(ROOT / 'web-v2' / 'index.html', ROOT / 'web-v2' / 'style.css',
-          ROOT / 'web-v2' / 'app.js', 'sf6-matchup-tierlist.html')
+          'sf6-matchup.html')
 
 
 if __name__ == '__main__':

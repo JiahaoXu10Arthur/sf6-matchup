@@ -2,97 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SF6 Matchup Lab — Tier View</title>
-  <meta name="description" content="Street Fighter 6 matchup tier list and sub-character finder, built on Capcom Buckler diagram data.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <title>SF6 Matchup Lab</title>
+  <meta http-equiv="refresh" content="0; url=../web/">
+  <link rel="canonical" href="../web/">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">SF6</span>
-      <span class="brand-name">MATCHUP <em>TIERS</em></span>
-      <span class="brand-kicker" data-i18n="kicker">CAPCOM BUCKLER DATA · MASTER+</span>
-    </div>
-    <div class="topbar-right">
-      <a class="alt-link" href="../web/">↩ bar view</a>
-      <div class="lang-switch" role="group" aria-label="Language">
-        <button data-lang="en" class="active">EN</button>
-        <button data-lang="zh">中</button>
-      </div>
-      <button class="reset-btn" id="reset-btn" data-i18n="reset">Reset to defaults</button>
-    </div>
-  </header>
-
-  <div class="toolbar">
-    <nav class="view-switch" role="tablist" aria-label="View">
-      <button role="tab" aria-selected="true" data-view="match" class="active" data-i18n="viewMatch">Matchups</button>
-      <button role="tab" aria-selected="false" data-view="bars" data-i18n="viewBars">Bars</button>
-      <button role="tab" aria-selected="false" data-view="subs" data-i18n="viewSubs">Sub finder</button>
-      <button role="tab" aria-selected="false" data-view="scatter" data-i18n="viewScatter">Usage × Win</button>
-    </nav>
-    <label class="char-field">
-      <span class="control-label" data-i18n="character">Character</span>
-      <select id="char-select"></select>
-    </label>
-    <div class="rank-field">
-      <span class="control-label" id="rank-label" data-i18n="rankView">Rank view</span>
-      <div class="rank-tabs" role="tablist" aria-labelledby="rank-label">
-        <button role="tab" data-rank="comb" class="active" aria-selected="true" data-i18n="rankComb">COMB</button>
-        <button role="tab" data-rank="36" aria-selected="false" data-i18n-rank="36">Master</button>
-        <button role="tab" data-rank="40" aria-selected="false" data-i18n-rank="40">High</button>
-        <button role="tab" data-rank="41" aria-selected="false" data-i18n-rank="41">Grand</button>
-        <button role="tab" data-rank="42" aria-selected="false" data-i18n-rank="42">Ult</button>
-      </div>
-    </div>
-  </div>
-
-  <main class="board">
-    <section class="hero">
-      <div class="hero-id">
-        <img class="char-avatar" id="char-avatar" alt="">
-        <span class="view-label" id="view-label">MATCHUPS</span>
-        <span class="char-name" id="char-name">TERRY</span>
-      </div>
-      <div class="hero-summary" id="hero-summary"></div>
-    </section>
-
-    <section class="controls-card">
-      <div class="ctl-group">
-        <div class="control-head">
-          <span class="control-label" data-i18n="monthWeights">Month weights</span>
-          <div class="presets">
-            <button data-preset="current" class="active" data-i18n="presetCurrent">current</button>
-            <button data-preset="all" data-i18n="presetAll">all</button>
-          </div>
-        </div>
-        <div id="month-sliders"></div>
-      </div>
-      <div class="ctl-group" id="tier-control">
-        <span class="control-label"><span data-i18n="tierWeights">Tier weights</span> <small data-i18n="combMix">(COMB mix)</small></span>
-        <div id="tier-sliders"></div>
-        <small class="tier-hint" id="tier-hint" data-i18n="tierHint">COMB only — pick COMB above</small>
-      </div>
-      <div class="ctl-group ctl-group-end" id="exclude-control">
-        <span class="control-label" data-i18n="exclude">Exclude characters</span>
-        <label class="usage-toggle"><input type="checkbox" id="usage-toggle" checked>
-          <span data-i18n="usageWeight">Weight by usage</span></label>
-        <div class="exclude-chips" id="exclude-chips"></div>
-        <small class="exclude-hint" data-i18n="excludeHint">drop low-sample opponents</small>
-      </div>
-    </section>
-
-    <div class="caption" id="caption"></div>
-    <p class="reliab-legend" id="reliab-legend" hidden></p>
-    <div class="lanes" id="lanes" aria-live="polite"></div>
-    <p class="loading" id="loading" data-i18n="loading">Loading matrix…</p>
-  </main>
-
-  <script src="../web/i18n.js"></script>
-  <script src="../web/scoring.js"></script>
-  <script src="app.js"></script>
+  <p>The tier list moved. Redirecting to <a href="../web/">SF6 Matchup Lab</a>…</p>
 </body>
 </html>

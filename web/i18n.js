@@ -180,8 +180,8 @@ const SLUG_BY_NAME = {
   'M. BISON': 'vega', 'ZANGIEF': 'zangief',
 };
 
-// base path for headshots; web-v2 overrides to '../web/img/'. The standalone
-// build defines CHAR_IMG (slug -> data URI) which takes precedence for offline use.
+// base path for headshots (relative to the app at /web/). The standalone build
+// defines CHAR_IMG (slug -> data URI) which takes precedence for offline use.
 var IMG_BASE = 'img/';
 
 /* Headshot image URL for a character display name ('' if unknown). */

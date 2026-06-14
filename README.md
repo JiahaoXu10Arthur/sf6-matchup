@@ -27,15 +27,19 @@ zero-dependency browser application.
 
 ## Live demo
 
-Two interchangeable front-end designs share the same data and logic:
+One app, four view tabs over the same data and logic, at
+<https://jiahaoxu10arthur.github.io/sf6-matchup/web/>:
 
-| Design | Description | URL |
-|--------|-------------|-----|
-| **Bar view** (v1) | Dark "training-mode" diverging-bar table | <https://jiahaoxu10arthur.github.io/sf6-matchup/web/> |
-| **Tier list** (v2) | Bold esports tier-band layout (favourability lanes), per-matchup confidence dots, and a usage × win-rate scatter | <https://jiahaoxu10arthur.github.io/sf6-matchup/web-v2/> |
+| View | Description |
+|------|-------------|
+| **Matchups** (tiers) | Bold esports tier-band layout (favourability lanes) with per-matchup confidence dots |
+| **Bars** | Dark "training-mode" diverging-bar table |
+| **Sub finder** | Best secondary characters to cover your worst matchups |
+| **Usage × Win** | Smogon-style usage vs win-rate scatter (point size = polarization) |
 
-> GitHub Pages and Google Fonts are blocked in mainland China. For offline or
-> in-China sharing, use the self-contained files in [`standalone/`](#offline-standalone-build).
+> The older `/web-v2/` URL now redirects here. GitHub Pages and Google Fonts are
+> blocked in mainland China; for offline or in-China sharing, use the
+> self-contained file in [`standalone/`](#offline-standalone-build).
 
 ## Releases
 
@@ -77,9 +81,9 @@ sf6-matchup/
 │   ├── analyze.py               # per-character matchup table CLI
 │   ├── recommend.py             # complementary sub recommendation CLI
 │   └── build_standalone.py      # bundles the web app into offline single-file HTML
-├── web/                     # v1 — dark bar-view UI (index.html, style.css, app.js, scoring.js, i18n.js)
-├── web-v2/                  # v2 — tier-list UI (reuses ../web scoring.js + i18n.js)
-├── standalone/              # generated offline single-file builds
+├── web/                     # the app — four view tabs (index.html, style.css, app.js, scoring.js, i18n.js, img/)
+├── web-v2/                  # redirect stub → ../web/ (kept so old links resolve)
+├── standalone/              # generated offline single-file build
 ├── tests/                   # pytest suite incl. Python↔JS parity
 ├── docs/                    # METHOD.md (methodology), plan.md
 ├── data/buckler/            # raw Buckler JSON cache (gitignored)
@@ -202,14 +206,13 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 
 ```bash
 python3 -m http.server 8741        # from the repository root
-# Bar view:  http://localhost:8741/web/
-# Tier list: http://localhost:8741/web-v2/
+# App: http://localhost:8741/web/   (Matchups · Bars · Sub finder · Usage × Win)
 ```
 
-Both interfaces recalculate instantly in the browser from `output/matrix.csv`:
-character picker, per-rank tabs or tier-weighted COMB, live month- and
-tier-weight sliders, INGRID toggle, reset, and a Sub-finder view. The scoring
-math in `web/scoring.js` is a direct port of `scripts/scoring.py`;
+The app recalculates instantly in the browser from `output/matrix.csv`:
+character picker, per-rank tabs or tier-weighted COMB, directly-editable month and
+tier weights, per-opponent usage weights, INGRID toggle, reset, and the four view
+tabs. The scoring math in `web/scoring.js` is a direct port of `scripts/scoring.py`;
 `tests/test_js_parity.py` asserts the two implementations agree to `1e-9`.
 
 ## Offline standalone build
@@ -222,13 +225,12 @@ download and open directly. To rebuild from current data:
 python3 scripts/build_standalone.py
 ```
 
-Produces two self-contained files in `standalone/` with the dataset, code, and
+Produces one self-contained file in `standalone/` with the dataset, code, and
 styles inlined and all external dependencies removed:
 
-- `sf6-matchup-bars.html` — v1 bar view
-- `sf6-matchup-tierlist.html` — v2 tier list
+- `sf6-matchup.html` — the full app (all four view tabs)
 
-Each runs by double-clicking — no internet, server, or installation required —
+It runs by double-clicking — no internet, server, or installation required —
 and can be shared by email, messaging, or USB. Custom display fonts are omitted
 (they require Google Fonts); the layout falls back to the system typeface.
 
@@ -240,8 +242,9 @@ python3 -m pytest tests/ -v        # requires `node` for the JS parity tests
 
 ## Deployment (GitHub Pages)
 
-Push the repository and enable Pages on the `main` branch (root). The apps are
-then served at `https://<user>.github.io/<repo>/web/` and `/web-v2/`.
+Push the repository and enable Pages on the `main` branch (root). The app is
+then served at `https://<user>.github.io/<repo>/web/` (the old `/web-v2/` URL
+redirects there).
 
 ## Attribution and disclaimer
 
