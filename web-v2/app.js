@@ -9,6 +9,7 @@ const state = {
   monthW: {},
   tierW: { 36: 0.5, 40: 1, 41: 2, 42: 3 },
   oppW: { INGRID: 0 },    // per-opponent weight (sparse; absent = 1). 0 = exclude, >1 = target
+  usageW: {},             // per-opponent usage-weight override (sparse; absent = auto from play rate)
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
   useUsage: true,         // weight opponents by play rate (down-weights rare chars)
 };
@@ -91,11 +92,12 @@ function applyI18n() {
 
 function exclude() { return new Set(Object.keys(state.oppW).filter(c => state.oppW[c] === 0)); }
 
-// usage-weight map for the active months (null when the toggle is off)
+// usage-weight map for the active months (null when the toggle is off).
+// per-opponent manual overrides in state.usageW win over the auto play-rate value.
 function usageMap() {
   if (!state.useUsage || !usageCsv) return null;
   const active = months.filter(m => (state.monthW[m] ?? 0) > 0);
-  return usageWeights(usageRates(usageCsv, active, 36));
+  return { ...usageWeights(usageRates(usageCsv, active, 36)), ...state.usageW };
 }
 
 /* ---------- controls (shared shape with v1) ---------- */
@@ -129,16 +131,21 @@ function buildOppWeights() {
       <span class="opp-name">${cn(c)}</span>
       <input class="opp-val" type="number" min="0" step="0.1" aria-label="${cn(c)} weight">
       <button class="opp-step" data-d="1" aria-label="increase">+</button>
-      <span class="opp-usage" title="${t('usageWeight')}"></span>`;
+      <span class="opp-usage-wrap" title="${t('usageWeight')}">×<input class="opp-usage" type="number" min="0" step="0.05" aria-label="${cn(c)} usage weight"></span>`;
     const inp = el.querySelector('.opp-val');
-    const usageEl = el.querySelector('.opp-usage');
+    const usageInp = el.querySelector('.opp-usage');
+    const usageWrap = el.querySelector('.opp-usage-wrap');
     const paint = () => {
       const w = state.oppW[c] ?? 1;
       inp.value = w;
       el.classList.toggle('excluded', w === 0);
       el.classList.toggle('targeted', w > 1);
       const uw = usage ? usage[c] : null;
-      usageEl.textContent = uw == null ? '' : '×' + uw.toFixed(2);
+      usageWrap.hidden = uw == null;
+      if (uw != null) {
+        usageInp.value = uw.toFixed(2);
+        usageInp.classList.toggle('overridden', c in state.usageW);
+      }
     };
     const setW = w => {
       w = Math.round(Math.max(0, w) * 100) / 100;
@@ -149,17 +156,31 @@ function buildOppWeights() {
     inp.addEventListener('change', () => setW(parseFloat(inp.value) || 0));
     el.querySelectorAll('.opp-step').forEach(btn =>
       btn.addEventListener('click', () => setW((state.oppW[c] ?? 1) + Number(btn.dataset.d))));
+    // usage-weight override: empty reverts to the auto play-rate value
+    usageInp.addEventListener('change', () => {
+      const raw = usageInp.value.trim();
+      if (raw === '') delete state.usageW[c];
+      else state.usageW[c] = Math.round(Math.max(0, parseFloat(raw) || 0) * 100) / 100;
+      render();
+    });
     paint();
     box.appendChild(el);
   }
 }
 
-// refresh the per-opponent usage badges (live on toggle / month change)
+// refresh the per-opponent usage inputs (live on toggle / month change / override)
 function paintUsageBadges() {
   const usage = usageMap();
   document.querySelectorAll('#exclude-chips .opp-w').forEach(el => {
-    const uw = usage ? usage[el.dataset.char] : null;
-    el.querySelector('.opp-usage').textContent = uw == null ? '' : '×' + uw.toFixed(2);
+    const c = el.dataset.char;
+    const uw = usage ? usage[c] : null;
+    const wrap = el.querySelector('.opp-usage-wrap');
+    const inp = el.querySelector('.opp-usage');
+    wrap.hidden = uw == null;
+    if (uw != null && inp !== document.activeElement) {   // don't clobber mid-edit
+      inp.value = uw.toFixed(2);
+      inp.classList.toggle('overridden', c in state.usageW);
+    }
   });
 }
 
@@ -191,22 +212,25 @@ function buildMonthSliders() {
   box.textContent = '';
   const fmtw = w => String(Math.round(w * 100) / 100);
   const label = m => `${m.slice(0, 4)}.${m.slice(4)}`;
+  const setMonth = (m, w) => {
+    state.monthW[m] = Math.round(Math.max(0, Math.min(1, w)) * 100) / 100;
+    setPreset('custom');
+    buildMonthSliders();   // a month set to 0 drops to the add-picker on rebuild
+    render();
+  };
   for (const m of months.filter(x => (state.monthW[x] ?? 0) > 0)) {
     const row = document.createElement('div');
     row.className = 'month-w';
     row.dataset.month = m;
     row.innerHTML = `<button class="month-step" data-d="-1" aria-label="decrease ${label(m)} weight">−</button>
       <span class="month-name">${label(m)}</span>
-      <span class="month-val">${fmtw(state.monthW[m])}</span>
+      <input class="month-val" type="number" min="0" max="1" step="${MONTH_STEP}" value="${fmtw(state.monthW[m])}" aria-label="${label(m)} weight">
       <button class="month-step" data-d="1" aria-label="increase ${label(m)} weight">+</button>`;
+    row.querySelector('.month-val').addEventListener('change', e =>
+      setMonth(m, parseFloat(e.target.value) || 0));
     row.querySelectorAll('.month-step').forEach(btn =>
-      btn.addEventListener('click', () => {
-        const w = Math.max(0, Math.min(1, (state.monthW[m] ?? 0) + Number(btn.dataset.d) * MONTH_STEP));
-        state.monthW[m] = Math.round(w * 100) / 100;
-        setPreset('custom');
-        buildMonthSliders();
-        render();
-      }));
+      btn.addEventListener('click', () =>
+        setMonth(m, (state.monthW[m] ?? 0) + Number(btn.dataset.d) * MONTH_STEP)));
     box.appendChild(row);
   }
   const inactive = months.filter(m => !((state.monthW[m] ?? 0) > 0));
@@ -225,10 +249,13 @@ function buildMonthSliders() {
     });
     box.appendChild(sel);
   }
-  // restore focus to the same control (or the add picker if the month dropped out)
+  // restore focus to the same control (stepper, value input, or the add picker
+  // if the month dropped out)
   if (focusMonth) {
-    const same = box.querySelector(`.month-w[data-month="${focusMonth}"] .month-step[data-d="${focusDir}"]`);
-    (same || box.querySelector('.month-add'))?.focus();
+    const sel = focusDir
+      ? `.month-w[data-month="${focusMonth}"] .month-step[data-d="${focusDir}"]`
+      : `.month-w[data-month="${focusMonth}"] .month-val`;
+    (box.querySelector(sel) || box.querySelector('.month-add'))?.focus();
   }
 }
 
@@ -256,6 +283,7 @@ function resetDefaults() {
   state.rank = 'comb';
   state.tierW = { ...DEFAULT_TIER };
   state.oppW = { INGRID: 0 };
+  state.usageW = {};
   state.useUsage = true;
   $('#usage-toggle').checked = true;
   setPreset('current');
