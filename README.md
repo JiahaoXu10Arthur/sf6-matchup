@@ -27,7 +27,7 @@ zero-dependency browser application.
 
 ## Live demo
 
-One app, four view tabs over the same data and logic, at
+One app, five view tabs over the same data and logic, at
 <https://jiahaoxu10arthur.github.io/sf6-matchup/web/>:
 
 | View | Description |
@@ -35,7 +35,11 @@ One app, four view tabs over the same data and logic, at
 | **Matchups** (tiers) | Bold esports tier-band layout (favourability lanes) with per-matchup confidence dots |
 | **Bars** | Dark "training-mode" diverging-bar table |
 | **Sub finder** | Best secondary characters to cover your worst matchups |
-| **Usage × Win** | Smogon-style usage vs win-rate scatter (point size = polarization) |
+| **Usage × Win** | Smogon-style cast-wide usage vs win-rate scatter (point size = polarization) |
+| **Matchup map** | Per-character scatter — each opponent plotted by encounter frequency vs your win rate; lower-right (common · losing) is the practice priority |
+
+Clicking any character (chip, bar, or point) opens a detail card — win rate, usage,
+and its strongest/weakest matchups — with a button to jump to that character's page.
 
 > The older `/web-v2/` URL now redirects here. GitHub Pages and Google Fonts are
 > blocked in mainland China; for offline or in-China sharing, use the
@@ -57,15 +61,22 @@ Prebuilt offline files are attached to each
 
 - **Any character, any time range** — `--char`, `--months 202502-202605` (cross-year supported).
 - **All four rank brackets** — Master / High / Grand / Ultimate Master, viewable individually or
-  combined with a default 0.5 : 1 : 2 : 3 skill-depth weighting (Ultimate weighted most, Master least; continuously adjustable — see [methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)).
+  combined with a default 0 : 1 : 2 : 3 skill-depth weighting (Ultimate weighted most; Master excluded by default but continuously dial-able — see [methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights)).
 - **Patch-aware month weighting** — `current` (post-patch) and `all` (equal) presets, or
   fully custom per-month weights; the same `{month: weight}` dictionary drives the
   interactive sliders.
 - **Per-matchup confidence** — each matchup carries a ●●● / ●●○ / ●○○ reliability dot
   derived from data depth (contributing months), rank-tier coverage, and cross-rank
   agreement, since Buckler does not publish sample sizes.
-- **Usage × win-rate scatter** — a cast-wide view plotting how often each character is
-  played against their overall win rate, split into over/under-rated quadrants.
+- **Usage-aware sub ranking** — opponents are weighted by popularity so the sub finder
+  prioritises covering characters you actually meet. The play-rate is a **tier- and
+  month-weighted blend** over the rank×month grid (the same weights as the matchup scores),
+  so it follows whatever rank/month focus you set; per-opponent overrides are available.
+- **Two scatter views** — a cast-wide **Usage × Win** meta map (popularity vs win rate,
+  over/under-rated quadrants) and a per-character **Matchup map** (each opponent by encounter
+  frequency vs your win rate) that surfaces the common, losing matchups worth drilling.
+- **Character detail card** — click any character anywhere to see its win rate, usage, and
+  best/worst matchups, with a one-click jump to its own page.
 - **Bilingual UI** — English and Simplified Chinese, with auto-detection and a manual toggle.
 - **Offline single-file builds** — the entire app and dataset inlined into one shareable HTML file.
 
@@ -81,7 +92,7 @@ sf6-matchup/
 │   ├── analyze.py               # per-character matchup table CLI
 │   ├── recommend.py             # complementary sub recommendation CLI
 │   └── build_standalone.py      # bundles the web app into offline single-file HTML
-├── web/                     # the app — four view tabs (index.html, style.css, app.js, scoring.js, i18n.js, img/)
+├── web/                     # the app — five view tabs (index.html, style.css, app.js, scoring.js, i18n.js, img/)
 ├── web-v2/                  # redirect stub → ../web/ (kept so old links resolve)
 ├── standalone/              # generated offline single-file build
 ├── tests/                   # pytest suite incl. Python↔JS parity
@@ -133,7 +144,7 @@ Month-weight profiles (`w_m`):
 | custom (`--weights`) | user-supplied per-month values |
 
 **4. Tier combination → COMB.** The per-rank means are combined across whichever
-tiers have data, using default skill-depth weights `W = {Master: 0.5, High: 1, Grand: 2, Ult: 3}`
+tiers carry weight, using default skill-depth weights `W = {Master: 0, High: 1, Grand: 2, Ult: 3}`
 (continuously adjustable in the web app):
 
 ```text
@@ -141,10 +152,10 @@ COMB(O) = Σ_r  W_r · m̄(O, r)  /  Σ_r  W_r
 ```
 
 Ultimate Master carries the most weight: higher rank = deeper game understanding,
-so its matchup reads sit closest to the matchup's true value; Master (entry
-bracket) gets the lightest default. This is a deliberate bias-over-variance
-choice — Ultimate is the *noisiest* tier (smallest population) but the most
-informed — explained in
+so its matchup reads sit closest to the matchup's true value; Master (the entry
+bracket — largest but noisiest) is excluded by default and can be dialed back in.
+This is a deliberate bias-over-variance choice — Ultimate is the *noisiest* tier
+(smallest population) but the most informed — explained in
 [the methodology](docs/METHOD.md#3-rank-tiers-and-skill-depth-weights). A
 single-rank view (`--profile` on a chosen rank) simply uses `m̄(O, r)` directly.
 A per-opponent **Δpatch** drift = (Grand Master post-patch mean − pre-patch
@@ -206,12 +217,12 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 
 ```bash
 python3 -m http.server 8741        # from the repository root
-# App: http://localhost:8741/web/   (Matchups · Bars · Sub finder · Usage × Win)
+# App: http://localhost:8741/web/   (Matchups · Bars · Sub finder · Usage × Win · Matchup map)
 ```
 
 The app recalculates instantly in the browser from `output/matrix.csv`:
 character picker, per-rank tabs or tier-weighted COMB, directly-editable month and
-tier weights, per-opponent usage weights, INGRID toggle, reset, and the four view
+tier weights, per-opponent usage weights, INGRID toggle, reset, and the five view
 tabs. The scoring math in `web/scoring.js` is a direct port of `scripts/scoring.py`;
 `tests/test_js_parity.py` asserts the two implementations agree to `1e-9`.
 
@@ -228,7 +239,7 @@ python3 scripts/build_standalone.py
 Produces one self-contained file in `standalone/` with the dataset, code, and
 styles inlined and all external dependencies removed:
 
-- `sf6-matchup.html` — the full app (all four view tabs)
+- `sf6-matchup.html` — the full app (all five view tabs)
 
 It runs by double-clicking — no internet, server, or installation required —
 and can be shared by email, messaging, or USB. Custom display fonts are omitted
