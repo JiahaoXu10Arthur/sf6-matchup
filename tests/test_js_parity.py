@@ -14,8 +14,8 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 from analyze import char_table, combined_row
 from roster import NAME_BY_SLUG, PATCH_MONTH
-from scoring import (correlation, coverage, month_weights, shared_weaknesses,
-                     specialization, strength)
+from scoring import (correlation, coverage, month_weights, reliability,
+                     shared_weaknesses, specialization, strength)
 
 MATRIX = ROOT / 'output' / 'matrix.csv'
 # Derive months from the matrix so the Python side matches whatever the JS
@@ -55,7 +55,7 @@ def test_char_table_matches_python(parity):
     py = {r[0]: r for r in char_table('TERRY', MONTHS, mw, {'INGRID'})}
     assert set(js['table']) == set(py)
     for opp, j in js['table'].items():
-        opp_, t36, t40, t41, t42, comb, spread, dpatch, nmonths = py[opp]
+        opp_, t36, t40, t41, t42, comb, spread, dpatch, nmonths, nmo, nranks = py[opp]
         assert j['comb'] == pytest.approx(comb, abs=TOL)
         for jv, pv in ((j['t36'], t36), (j['t40'], t40), (j['t41'], t41),
                        (j['t42'], t42), (j['dpatch'], dpatch)):
@@ -64,6 +64,9 @@ def test_char_table_matches_python(parity):
                 assert jv == pytest.approx(pv, abs=TOL)
         assert j['spread'] == pytest.approx(spread, abs=TOL)
         assert j['nmonths'] == nmonths
+        assert j['nmo'] == nmo
+        assert j['nranks'] == nranks
+        assert j['reliab'] == reliability(nmo, nranks, spread)['level']
 
 
 def test_sub_table_matches_python(parity):

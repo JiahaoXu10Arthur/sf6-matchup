@@ -16,7 +16,8 @@ const usage = usageJson ? JSON.parse(usageJson) : undefined;
 const table = {};
 for (const r of s.charTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, s.PATCH_MONTH)) {
   table[r.opp] = { comb: r.comb, t36: r.t36, t40: r.t40, t41: r.t41, t42: r.t42,
-                   spread: r.spread, dpatch: r.dpatch, nmonths: r.nmonths };
+                   spread: r.spread, dpatch: r.dpatch, nmonths: r.nmonths,
+                   nmo: r.nmo, nranks: r.nranks, reliab: r.reliab };
 }
 
 const subs = {};

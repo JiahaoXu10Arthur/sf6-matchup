@@ -57,6 +57,18 @@ function strength(row) {
   return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 5.0;
 }
 
+// How much agreeing data backs a single combined matchup number. Confidence from
+// contributing months (depth), rank-tier coverage (breadth), and cross-rank spread
+// (do the four skill brackets agree?). A fully-sampled cell never falls to 'low' on
+// rank disagreement alone. Keep in sync with reliability() in scripts/scoring.py.
+function reliability(nmo, nranks, spread) {
+  const depth = Math.min(nmo, 3) / 3 * 0.4 + Math.min(nranks, 4) / 4 * 0.3; // 0..0.7
+  const agree = Math.max(0, 1 - spread / 0.6) * 0.3;                        // 0..0.3
+  const score = depth + agree;                                             // 0..1
+  const level = score >= 0.85 ? 'high' : score < 0.6 ? 'low' : 'med';
+  return { level, score };
+}
+
 function coverage(mainRow, subRow, oppWeights, usage) {
   // weakness-weighted ABSOLUTE edge. Missing subRow entries count as neutral (5.0).
   const w = weaknessWeights(mainRow, oppWeights, usage);
@@ -171,15 +183,24 @@ function charTable(idx, char, mw, exclude, tierWeights, patchMonth) {
     }
     const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
     const monthsSeen = new Set();
+    const monthsUsed = new Set();
     for (const r of Object.values(byrank))
-      for (const m of Object.keys(r)) if (m in mw) monthsSeen.add(m);
+      for (const m of Object.keys(r)) {
+        if (m in mw) monthsSeen.add(m);
+        if (mw[m]) monthsUsed.add(m);   // contributing months: nonzero weight
+      }
+    const spread = Math.max(...present) - Math.min(...present);
+    const nranks = present.length;
     rows.push({
       opp,
       t36: tier['36'], t40: tier['40'], t41: tier['41'], t42: tier['42'],
       comb: num / den,
-      spread: Math.max(...present) - Math.min(...present),
+      spread,
       dpatch: pre.length && post.length ? mean(post) - mean(pre) : null,
       nmonths: monthsSeen.size,
+      nmo: monthsUsed.size,
+      nranks,
+      reliab: reliability(monthsUsed.size, nranks, spread).level,
     });
   }
   rows.sort((a, b) => a.comb - b.comb);
@@ -218,6 +239,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     PATCH_MONTH, DEFAULT_TIER_WEIGHTS, RANK_NAMES, TARGET_INJECT,
     monthWeights, wavg, coverage, specialization, strength, correlation, sharedWeaknesses,
-    usageWeights, usageRates, buildIndex, availableMonths, combinedRow, charTable, subTable,
+    reliability, usageWeights, usageRates, buildIndex, availableMonths, combinedRow,
+    charTable, subTable,
   };
 }

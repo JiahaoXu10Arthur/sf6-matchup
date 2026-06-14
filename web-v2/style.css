@@ -305,6 +305,18 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .chip-trend.up { color: var(--t-adv); }
 .chip-trend.dn { color: var(--t-dis); }
 .chip-flag { color: var(--t-sdis); font-size: 0.78rem; }
+.chip-reliab {
+  font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1;
+  font-family: var(--font-mono); cursor: help; flex: none;
+}
+.chip-reliab.r-high { color: var(--t-adv); opacity: 0.55; }
+.chip-reliab.r-med  { color: var(--t-sdis); opacity: 0.9; }
+.chip-reliab.r-low  { color: var(--t-dis); opacity: 1; }
+
+.reliab-legend {
+  margin: -0.25rem 0 0.9rem; font-size: 0.74rem; line-height: 1.45;
+  color: var(--muted, #8b93a7); max-width: 60ch;
+}
 .chip-corr { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 .chip-corr.good { color: var(--t-adv); }
 .chip-corr.bad { color: var(--t-dis); }

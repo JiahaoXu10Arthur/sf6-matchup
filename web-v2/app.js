@@ -337,18 +337,21 @@ function laneHtml(tier, chips) {
   </section>`;
 }
 
+const RELIAB_PIPS = { high: '●●●', med: '●●○', low: '●○○' };
+const RELIAB_LABEL = { high: 'reliabHigh', med: 'reliabMed', low: 'reliabLow' };
+
 function matchChip(r, metric) {
   const v = metric(r);
   const tierCls = MATCH_TIERS.find(tr => v >= tr.lo && v < tr.hi).cls;
   const trend = r.dpatch === null ? ''
     : r.dpatch <= -0.1 ? '<span class="chip-trend dn">↓</span>'
     : r.dpatch >= 0.1 ? '<span class="chip-trend up">↑</span>' : '';
-  const flag = r.spread > 0.25 ? `<span class="chip-flag" title="${t('spreadFlag')}">⚠</span>` : '';
-  const title = `High ${fmt(r.t40)} · Grand ${fmt(r.t41)} · Ult ${fmt(r.t42)} · Δ ${sfmt(r.dpatch)} · ${t('chipHint')}`;
+  const pip = `<span class="chip-reliab r-${r.reliab}" title="${t(RELIAB_LABEL[r.reliab])}" aria-label="${t(RELIAB_LABEL[r.reliab])}">${RELIAB_PIPS[r.reliab]}</span>`;
+  const title = `High ${fmt(r.t40)} · Grand ${fmt(r.t41)} · Ult ${fmt(r.t42)} · Δ ${sfmt(r.dpatch)} · ${r.nmo}${t('moSuffix')} · ${t('chipHint')}`;
   return `<button class="chip ${tierCls}" data-char="${r.opp}" title="${title}">
     <img class="chip-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.display='none'">
     <span class="chip-name">${cn(r.opp)}</span>
-    <span class="chip-score">${fmt(v, 2)}</span>${trend}${flag}
+    <span class="chip-score">${fmt(v, 2)}</span>${trend}${pip}
   </button>`;
 }
 
@@ -375,6 +378,10 @@ function renderMatch() {
                        .sort((a, b) => metric(a) - metric(b));
     return laneHtml(tier, inTier.map(r => matchChip(r, metric)));
   }).join('');
+
+  const legend = $('#reliab-legend');
+  legend.textContent = t('reliabLegend');
+  legend.hidden = false;
 
   wireChips();
 }
@@ -404,6 +411,7 @@ function subRow(r, i, cover, maxAbs) {
 }
 
 function renderSubs() {
+  $('#reliab-legend').hidden = true;
   const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW, usageMap());
   const cover = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
   const sortVal = r => state.subSort === 'spec' ? r.spec

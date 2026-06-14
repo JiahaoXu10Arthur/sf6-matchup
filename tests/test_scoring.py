@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 from scoring import (month_weights, wavg, coverage, correlation,
                      shared_weaknesses, expand_months, specialization, strength,
-                     usage_weights)
+                     usage_weights, reliability)
 
 MONTHS = ['202601', '202602', '202603', '202604', '202605']
 
@@ -151,3 +151,31 @@ def test_correlation_single_shared_opponent_returns_zero():
 
 def test_wavg_disjoint_weight_keys_returns_none():
     assert wavg({'a': 4.0}, {'b': 1.0}) is None
+
+
+def test_reliability_full_data_agreeing_ranks_is_high():
+    # 3 contributing months, all 4 ranks, ranks agree (tiny spread)
+    assert reliability(3, 4, 0.05)['level'] == 'high'
+
+
+def test_reliability_full_data_contested_ranks_drops_to_med():
+    # full depth but the four skill brackets disagree strongly -> still not "low"
+    assert reliability(3, 4, 0.5)['level'] == 'med'
+
+
+def test_reliability_sparse_data_is_low():
+    # one month, two ranks -> genuinely thin data
+    assert reliability(1, 2, 0.1)['level'] == 'low'
+
+
+def test_reliability_score_is_monotonic_in_depth_and_agreement():
+    # more months, more ranks, and tighter agreement never lower the score
+    base = reliability(2, 3, 0.3)['score']
+    assert reliability(3, 3, 0.3)['score'] >= base   # more months
+    assert reliability(2, 4, 0.3)['score'] >= base   # more ranks
+    assert reliability(2, 3, 0.1)['score'] >= base   # tighter agreement
+
+
+def test_reliability_score_bounded_unit_interval():
+    assert reliability(3, 4, 0.0)['score'] == pytest.approx(1.0)
+    assert 0.0 <= reliability(0, 0, 5.0)['score'] <= 1.0

@@ -88,6 +88,23 @@ def strength(row):
     return fmean(row.values()) if row else 5.0
 
 
+def reliability(nmo, nranks, spread):
+    """How much agreeing data backs a single combined matchup number.
+
+    The Buckler source does not publish sample sizes, so confidence is derived
+    from what we do observe: contributing months (data depth), rank-tier coverage
+    (breadth), and cross-rank spread (do the four skill brackets agree?). Returns
+    {'level': 'high'|'med'|'low', 'score': 0..1}. A fully-sampled cell never falls
+    to 'low' on rank disagreement alone; 'low' is reserved for genuinely thin data.
+
+    Keep in sync with reliability() in web/scoring.js (parity-tested)."""
+    depth = min(nmo, 3) / 3 * 0.4 + min(nranks, 4) / 4 * 0.3   # 0..0.7 coverage
+    agree = max(0.0, 1.0 - spread / 0.6) * 0.3                 # 0..0.3 agreement
+    score = depth + agree                                      # 0..1
+    level = 'high' if score >= 0.85 else 'low' if score < 0.6 else 'med'
+    return {'level': level, 'score': score}
+
+
 def coverage(main_row, sub_row, opp_weights=None, usage=None):
     """Sub coverage of main's weaknesses: weakness-weighted ABSOLUTE edge.
 

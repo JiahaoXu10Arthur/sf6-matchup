@@ -4,7 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from roster import PATCH_MONTH, TIER_WEIGHTS
-from scoring import expand_months, month_weights, parse_weights, wavg
+from scoring import expand_months, month_weights, parse_weights, reliability, wavg
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -67,8 +67,10 @@ def char_table(char, months, mw, exclude):
         post = [v for m, v in g.items() if m > PATCH_MONTH]
         dpatch = (sum(post) / len(post) - sum(pre) / len(pre)) if pre and post else None
         nmonths = len({m for r in byrank.values() for m in r})
+        nmo = len({m for r in byrank.values() for m in r if mw.get(m)})
+        nranks = len(present)
         rows.append((opp, tier.get(36), tier[40], tier[41], tier[42],
-                     comb, spread, dpatch, nmonths))
+                     comb, spread, dpatch, nmonths, nmo, nranks))
     rows.sort(key=lambda r: r[5])
     return rows
 
@@ -96,14 +98,16 @@ def main():
         f'# {args.char} matchups — months {months[0]}–{months[-1]}, '
         f'profile={label}, tiers {wlabel} (Master:HighM:GrandM:UltM)',
         '',
-        '| Opponent | Master | HighM | GrandM | UltM | COMB | spread | Δpatch | months |',
-        '|---|---|---|---|---|---|---|---|---|',
+        '| Opponent | Master | HighM | GrandM | UltM | COMB | conf | spread | Δpatch | months |',
+        '|---|---|---|---|---|---|---|---|---|---|',
     ]
-    for opp, t36, t40, t41, t42, comb, spread, dpatch, nm in rows:
+    dots = {'high': '●●●', 'med': '●●○', 'low': '●○○'}
+    for opp, t36, t40, t41, t42, comb, spread, dpatch, nm, nmo, nranks in rows:
         noisy = ' ⚠' if spread > 0.25 else ''
+        conf = dots[reliability(nmo, nranks, spread)['level']]
         lines.append(
             f'| {opp} | {fmt(t36)} | {fmt(t40)} | {fmt(t41)} | {fmt(t42)} | **{comb:.3f}**'
-            f'{noisy} | {spread:.3f} | {fmt(dpatch, 3)} | {nm}/{len(months)} |')
+            f'{noisy} | {conf} | {spread:.3f} | {fmt(dpatch, 3)} | {nm}/{len(months)} |')
     text = '\n'.join(lines) + '\n'
     out = ROOT / 'output' / f'{args.char}_{months[0]}-{months[-1]}_{label}.md'
     out.write_text(text)
