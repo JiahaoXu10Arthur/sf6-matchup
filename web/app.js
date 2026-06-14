@@ -503,8 +503,7 @@ function barRowHtml(r, metric) {
     <div class="bar-track"><div class="bar ${barCls}" style="transform:scaleX(${Math.abs(frac)})"></div></div>
     <div class="nums">
       <span class="col-main ${v >= 5 ? 'adv' : 'dis'}">${fmt(v, 2)}</span>
-      <span class="col-sub">Δ ${sfmt(r.dpatch)}</span>
-      <span class="col-sub">${r.nmonths}/${months.length}${t('moSuffix')}</span>
+      <span class="col-sub" title="${t('hDpatchHint')}">Δ ${sfmt(r.dpatch)}</span>
     </div>
   </div>`;
 }
@@ -534,7 +533,7 @@ function renderBars() {
     `<div class="kpi ${c.tone || ''}"><span class="kpi-label">${c.label}</span><span class="kpi-val">${c.val}${c.sub ? `<small>${c.sub}</small>` : ''}</span></div>`).join('');
   const axisHtml = `<span>${t('axisOpponent')}</span>` +
     `<span class="axis-bar"><span>${t('axisLosing')}</span><span>${t('axisEven')}</span><span>${t('axisWinning')}</span></span>` +
-    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub">${t('hDpatch')}</span><span class="col-sub">${t('hMo')}</span></div>`;
+    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub" title="${t('hDpatchHint')}">${t('hDpatch')}</span></div>`;
 
   $('#lanes').innerHTML =
     `<div class="bars"><div class="kpis">${kpiHtml}</div><div class="axis">${axisHtml}</div>` +

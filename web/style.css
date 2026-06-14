@@ -384,7 +384,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 .lb-head .lb-corr, .lb-head .lb-shared { text-align: right; }
 
 /* sortable column headers */
-.lb-sort { cursor: pointer; transition: color var(--dur) var(--ease); }
+.lb-sort { cursor: pointer; white-space: nowrap; transition: color var(--dur) var(--ease); }
 .lb-sort:hover { color: var(--text); }
 .lb-sort.active { color: var(--accent); }
 
@@ -462,7 +462,7 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
   --dis-deep: oklch(52% 0.16 40);
   --even-line: oklch(50% 0.04 265);
   --name-col: 10rem;
-  --num-col: 12.6rem;
+  --num-col: 9rem;
 }
 
 .bars .kpis { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap; }
@@ -537,7 +537,7 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
   box-shadow: 0 0 10px oklch(68% 0.19 40 / 0.25);
 }
 .bars .nums {
-  display: flex; justify-content: flex-end; gap: 0.7rem;
+  display: grid; grid-template-columns: 3rem 5.4rem; gap: 0.6rem;
   font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 0.78rem;
 }
 .bars .col-main { font-family: var(--font-mono); font-weight: 700; text-align: right; font-size: 0.85rem; }
