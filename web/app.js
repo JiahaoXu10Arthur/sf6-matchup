@@ -307,6 +307,75 @@ function selectChar(c) {
   render();
 }
 
+/* ---------- character detail card (click any char chip) ---------- */
+
+let charCardEl = null;
+
+function closeCharCard() {
+  if (!charCardEl) return;
+  charCardEl.remove();
+  charCardEl = null;
+  document.removeEventListener('keydown', onCardKey);
+  document.removeEventListener('click', onCardOutside, true);
+}
+
+function onCardKey(e) { if (e.key === 'Escape') closeCharCard(); }
+function onCardOutside(e) { if (charCardEl && !charCardEl.contains(e.target)) closeCharCard(); }
+
+// pop a compact summary of a character (win-rate, usage, best/worst matchups)
+// anchored to the clicked element, with a button to drill into its own page.
+function openCharCard(char, anchor) {
+  closeCharCard();
+  if (!idx[char]) return;
+  const row = combinedRow(idx, char, state.monthW, exclude(), state.tierW);
+  const entries = Object.entries(row);
+  if (!entries.length) { selectChar(char); return; }   // no data under current weights -> just navigate
+  const win = strength(row) * 10;
+  const sorted = entries.slice().sort((a, b) => b[1] - a[1]);
+  const strong = sorted.slice(0, 3);
+  const weak = sorted.slice(-3).reverse();
+  const usage = (usageCsv ? usageRates(usageCsv, state.monthW, state.tierW)[char] : null);
+  const mini = arr => arr.map(([opp, sc]) =>
+    `<span class="cc-mini"><img src="${imgSrc(opp)}" alt="" loading="lazy" onerror="this.style.display='none'"><b>${cn(opp)}</b><i>${fmt(sc, 2)}</i></span>`).join('');
+
+  charCardEl = document.createElement('div');
+  charCardEl.className = 'char-card';
+  charCardEl.innerHTML =
+    `<div class="cc-head">
+       <img class="cc-avatar" src="${imgSrc(char)}" alt="" onerror="this.style.visibility='hidden'">
+       <span class="cc-name">${cn(char)}</span>
+       <button class="cc-close" aria-label="${t('close')}">×</button>
+     </div>
+     <div class="cc-stats">
+       <div class="cc-stat"><span class="cc-stat-label">${t('ccWin')}</span><span class="cc-stat-val ${win >= 50 ? 'adv' : 'dis'}">${win.toFixed(1)}%</span></div>
+       <div class="cc-stat"><span class="cc-stat-label">${t('ccUsage')}</span><span class="cc-stat-val">${usage != null ? usage.toFixed(1) + '%' : '—'}</span></div>
+     </div>
+     <div class="cc-mlist"><span class="cc-mhead adv">${t('ccStrong')}</span>${mini(strong)}</div>
+     <div class="cc-mlist"><span class="cc-mhead dis">${t('ccWeak')}</span>${mini(weak)}</div>
+     <button class="cc-go">${t('ccGo', { char: cn(char) })} →</button>`;
+  document.body.appendChild(charCardEl);
+  positionCharCard(charCardEl, anchor);
+
+  charCardEl.querySelector('.cc-close').addEventListener('click', closeCharCard);
+  charCardEl.querySelector('.cc-go').addEventListener('click', () => { closeCharCard(); selectChar(char); });
+  document.addEventListener('keydown', onCardKey);
+  // capture-phase outside-click, deferred so the opening click doesn't close it
+  setTimeout(() => document.addEventListener('click', onCardOutside, true), 0);
+}
+
+function positionCharCard(card, anchor) {
+  const r = anchor.getBoundingClientRect();
+  card.style.position = 'fixed';
+  card.style.visibility = 'hidden';
+  const cw = card.offsetWidth, ch = card.offsetHeight, pad = 8;
+  let left = Math.min(r.left, window.innerWidth - cw - pad);
+  let top = r.bottom + pad;
+  if (top + ch > window.innerHeight - pad) top = r.top - ch - pad;  // flip above if it would overflow
+  card.style.left = Math.max(pad, left) + 'px';
+  card.style.top = Math.max(pad, top) + 'px';
+  card.style.visibility = '';
+}
+
 function wireControls() {
   document.querySelectorAll('.view-switch button').forEach(b =>
     b.addEventListener('click', () => {
@@ -352,6 +421,7 @@ function wireControls() {
 const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter' };
 
 function render() {
+  closeCharCard();
   updateTierState();
   paintUsageBadges();
   if (state.view === 'match') renderMatch();
@@ -470,7 +540,7 @@ function renderBars() {
     `<div class="rows">${rows.map(r => barRowHtml(r, metric)).join('')}</div></div>`;
 
   document.querySelectorAll('#lanes .row[data-char]').forEach(el =>
-    el.addEventListener('click', () => selectChar(el.dataset.char)));
+    el.addEventListener('click', () => openCharCard(el.dataset.char, el)));
 }
 
 /* ---------- usage × win-rate scatter (cast-wide) ---------- */
@@ -572,7 +642,7 @@ function renderScatter() {
     </div>`;
 
   $('#lanes').querySelectorAll('.pt').forEach(g =>
-    g.addEventListener('click', () => selectChar(g.dataset.char)));
+    g.addEventListener('click', () => openCharCard(g.dataset.char, g)));
 }
 
 const strCls = s => s >= 5.05 ? 't-adv' : s <= 4.95 ? 't-dis' : '';
@@ -660,6 +730,6 @@ function wireChips() {
   document.querySelectorAll('#lanes [data-char]').forEach(el =>
     el.addEventListener('click', () => {
       const c = el.dataset.char;
-      if (idx[c]) selectChar(c);   // drill into that character's matchups
+      if (idx[c]) openCharCard(c, el);   // open the character detail card
     }));
 }
