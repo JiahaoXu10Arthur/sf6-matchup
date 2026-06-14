@@ -57,6 +57,23 @@ function strength(row) {
   return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 5.0;
 }
 
+// How well a main+partner ROSTER covers the cast: field whichever of the two has the
+// better matchup per opponent. covered = opponents the pair wins (max >= thresh);
+// patched = main's losing matchups the partner flips; losses = main's losses; total =
+// opponents in the main's row. Missing sub entries fall back to main. Sync with scoring.py.
+function pairCoverage(mainRow, subRow, thresh = 5.0) {
+  const total = Object.keys(mainRow).length;
+  let losses = 0, covered = 0, patched = 0;
+  for (const [opp, ms] of Object.entries(mainRow)) {
+    if (ms < thresh) {
+      losses++;
+      if ((subRow[opp] ?? 0.0) >= thresh) patched++;
+    }
+    if (Math.max(ms, subRow[opp] ?? ms) >= thresh) covered++;
+  }
+  return { total, losses, patched, covered };
+}
+
 // Spread of a character's combined matchup row = population std of its scores.
 // High = feast-or-famine; low = even across the cast. Keep in sync with scoring.py.
 function polarization(row) {
@@ -229,6 +246,7 @@ function subTable(idx, char, mw, exclude, tierWeights, oppWeights, usage) {
     for (const r of Object.keys(tierWeights))
       perTier[r] = coverage(mainRow, combinedRow(idx, sub, mw, exclude, tierWeights, [r]), oppWeights, usage);
     const w3 = worst3.filter(o => o in row).map(o => row[o]);
+    const pair = pairCoverage(mainRow, row);
     results.push({
       sub,
       cover: coverage(mainRow, row, oppWeights, usage),
@@ -238,6 +256,8 @@ function subTable(idx, char, mw, exclude, tierWeights, oppWeights, usage) {
       w3win: w3.length ? w3.reduce((s, v) => s + v, 0) / w3.length * 10 : null,
       corr: correlation(mainRow, row),
       shared: sharedWeaknesses(mainRow, row).length,
+      pairPatched: pair.patched, pairLosses: pair.losses,
+      pairCovered: pair.covered, pairTotal: pair.total,
     });
   }
   results.sort((a, b) => b.cover - a.cover);
@@ -248,7 +268,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     PATCH_MONTH, DEFAULT_TIER_WEIGHTS, RANK_NAMES, TARGET_INJECT,
     monthWeights, wavg, coverage, specialization, strength, correlation, sharedWeaknesses,
-    reliability, polarization, usageWeights, usageRates, buildIndex, availableMonths,
-    combinedRow, charTable, subTable,
+    reliability, polarization, pairCoverage, usageWeights, usageRates, buildIndex,
+    availableMonths, combinedRow, charTable, subTable,
   };
 }

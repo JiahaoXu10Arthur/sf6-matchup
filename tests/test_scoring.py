@@ -6,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
 from scoring import (month_weights, wavg, coverage, correlation,
                      shared_weaknesses, expand_months, specialization, strength,
-                     usage_weights, reliability, polarization)
+                     usage_weights, reliability, polarization, pair_coverage)
 
 MONTHS = ['202601', '202602', '202603', '202604', '202605']
 
@@ -199,3 +199,40 @@ def test_polarization_spread_row_exceeds_tight_row():
     spread = polarization({'A': 4.0, 'B': 6.0, 'C': 5.0})
     tight = polarization({'A': 4.9, 'B': 5.1, 'C': 5.0})
     assert spread > tight
+
+
+def test_pair_coverage_partner_patches_a_loss():
+    # main loses to A (4.0), wins B (5.5). Partner wins A (5.6), loses B (4.8).
+    main = {'A': 4.0, 'B': 5.5}
+    sub = {'A': 5.6, 'B': 4.8}
+    r = pair_coverage(main, sub)
+    assert r['total'] == 2
+    assert r['losses'] == 1          # only A is a main loss (<5.0)
+    assert r['patched'] == 1         # partner flips A to a win
+    assert r['covered'] == 2         # pair wins both (A via sub, B via main)
+
+
+def test_pair_coverage_partner_cannot_patch_shared_loss():
+    main = {'A': 4.0, 'B': 4.2}
+    sub = {'A': 4.5, 'B': 4.8}       # partner also loses both
+    r = pair_coverage(main, sub)
+    assert r['losses'] == 2
+    assert r['patched'] == 0
+    assert r['covered'] == 0
+
+
+def test_pair_coverage_missing_opponent_counts_as_main_only():
+    main = {'A': 4.0, 'B': 5.5}
+    sub = {'B': 5.9}                 # partner has no data vs A -> cannot patch it
+    r = pair_coverage(main, sub)
+    assert r['patched'] == 0
+    assert r['covered'] == 1         # only B is a pair win
+
+
+def test_pair_coverage_no_weaknesses():
+    main = {'A': 5.2, 'B': 5.5}
+    sub = {'A': 4.0, 'B': 4.0}
+    r = pair_coverage(main, sub)
+    assert r['losses'] == 0
+    assert r['patched'] == 0
+    assert r['covered'] == 2

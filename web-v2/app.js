@@ -502,7 +502,7 @@ function subRow(r, i, cover, maxAbs) {
   const pct = Math.min(100, Math.abs(cover) / maxAbs * 100);
   const corrCls = r.corr <= -0.1 ? 'good' : r.corr >= 0.1 ? 'bad' : '';
   const medal = i < 3 ? ` lb-medal-${i + 1}` : '';
-  const title = `${t('hCover')} ${sfmt(cover)} · ${t('hSpec')} ${sfmt(r.spec)} · ${t('hStr')} ${fmt(r.strength, 3)} · ${t('hCorr')} ${sfmt(r.corr, 2)} · ${t('chipHint')}`;
+  const title = `${t('hCover')} ${sfmt(cover)} · ${t('hSpec')} ${sfmt(r.spec)} · ${t('hStr')} ${fmt(r.strength, 3)} · ${t('hCorr')} ${sfmt(r.corr, 2)} · patches ${r.pairPatched}/${r.pairLosses}, roster covers ${r.pairCovered}/${r.pairTotal} · ${t('chipHint')}`;
   return `<button class="lb-row${medal}" data-char="${r.sub}" title="${title}">
     <span class="lb-rank">${i + 1}</span>
     <span class="lb-name"><img class="lb-avatar" src="${imgSrc(r.sub)}" alt="" loading="lazy" onerror="this.style.display='none'">${cn(r.sub)}</span>
@@ -529,9 +529,15 @@ function renderSubs() {
   // complement is drawn from the ranked (visible) set so it can't name a
   // character that was filtered out of the leaderboard.
   const compl = ranked.slice().sort((a, b) => a.corr - b.corr)[0];
+  // best duo partner = the one that patches the most of the main's losing matchups
+  // (tie-break by roster coverage), per the pair-coverage metric.
+  const duo = ranked.slice().sort((a, b) =>
+    (b.pairPatched - a.pairPatched) || (b.pairCovered - a.pairCovered))[0];
+  const duoPct = duo ? Math.round(duo.pairCovered / duo.pairTotal * 100) : 0;
   $('#hero-summary').innerHTML = (top && compl) ?
     `<span class="sum adv">${t('kTopSub')}: ${cn(top.sub)} ${sfmt(cover(top))}</span>` +
-    `<span class="sum even">${t('kComplement')}: ${cn(compl.sub)} r${sfmt(compl.corr, 2)}</span>` : '';
+    `<span class="sum even">${t('kComplement')}: ${cn(compl.sub)} r${sfmt(compl.corr, 2)}</span>` +
+    `<span class="sum adv" title="${t('patchHint')}">${t('kDuo')}: ${cn(state.char)} + ${cn(duo.sub)} → ${duo.pairCovered}/${duo.pairTotal} (${duoPct}%)</span>` : '';
 
   $('#caption').innerHTML = t('headSubs', {
     char: cn(state.char),

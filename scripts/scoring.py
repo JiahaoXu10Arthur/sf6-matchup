@@ -88,6 +88,25 @@ def strength(row):
     return fmean(row.values()) if row else 5.0
 
 
+def pair_coverage(main_row, sub_row, thresh=5.0):
+    """How well a main+partner ROSTER covers the cast: for each opponent you field
+    whichever of the two has the better matchup. 'covered' = opponents the pair wins
+    (max score >= thresh, default 5.0 = even-or-better); 'patched' = main's losing
+    matchups (< thresh) the partner flips to a win; 'losses' = main's losing matchups;
+    'total' = opponents in the main's row. Opponents missing from sub_row fall back to
+    the main alone (the partner can't help there). Keep in sync with web/scoring.js."""
+    total = len(main_row)
+    losses = covered = patched = 0
+    for opp, ms in main_row.items():
+        if ms < thresh:
+            losses += 1
+            if sub_row.get(opp, 0.0) >= thresh:
+                patched += 1
+        if max(ms, sub_row.get(opp, ms)) >= thresh:
+            covered += 1
+    return {'total': total, 'losses': losses, 'patched': patched, 'covered': covered}
+
+
 def polarization(row):
     """Spread of a character's combined matchup row = population std of its scores.
     High = feast-or-famine (hard counters and free wins); low = even across the cast.

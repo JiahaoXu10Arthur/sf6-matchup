@@ -25,7 +25,9 @@ const st = s.subTable(idx, charName, mw, exclude, s.DEFAULT_TIER_WEIGHTS, oppWei
 for (const r of st.results) {
   subs[r.sub] = { cover: r.cover, c36: r.c36, c40: r.c40, c41: r.c41, c42: r.c42,
                   spec: r.spec, strength: r.strength,
-                  w3win: r.w3win, corr: r.corr, shared: r.shared };
+                  w3win: r.w3win, corr: r.corr, shared: r.shared,
+                  pairPatched: r.pairPatched, pairLosses: r.pairLosses,
+                  pairCovered: r.pairCovered, pairTotal: r.pairTotal };
 }
 
 console.log(JSON.stringify({ worst3: st.worst3, table, subs }));
