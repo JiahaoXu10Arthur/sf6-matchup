@@ -6,3 +6,6 @@ __pycache__/
 
 # personal scout: your Capcom session + battlelog never leave your machine
 data/personal/
+
+# agent/session state — not project content
+.claude/
