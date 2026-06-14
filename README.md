@@ -32,7 +32,7 @@ Two interchangeable front-end designs share the same data and logic:
 | Design | Description | URL |
 |--------|-------------|-----|
 | **Bar view** (v1) | Dark "training-mode" diverging-bar table | <https://jiahaoxu10arthur.github.io/sf6-matchup/web/> |
-| **Tier list** (v2) | Bold esports tier-band layout (favourability lanes) | <https://jiahaoxu10arthur.github.io/sf6-matchup/web-v2/> |
+| **Tier list** (v2) | Bold esports tier-band layout (favourability lanes), per-matchup confidence dots, and a usage × win-rate scatter | <https://jiahaoxu10arthur.github.io/sf6-matchup/web-v2/> |
 
 > GitHub Pages and Google Fonts are blocked in mainland China. For offline or
 > in-China sharing, use the self-contained files in [`standalone/`](#offline-standalone-build).
@@ -56,6 +56,11 @@ Prebuilt offline files are attached to each
 - **Patch-aware month weighting** — `current` (post-patch) and `all` (equal) presets, or
   fully custom per-month weights; the same `{month: weight}` dictionary drives the
   interactive sliders.
+- **Per-matchup confidence** — each matchup carries a ●●● / ●●○ / ●○○ reliability dot
+  derived from data depth (contributing months), rank-tier coverage, and cross-rank
+  agreement, since Buckler does not publish sample sizes.
+- **Usage × win-rate scatter** — a cast-wide view plotting how often each character is
+  played against their overall win rate, split into over/under-rated quadrants.
 - **Bilingual UI** — English and Simplified Chinese, with auto-detection and a manual toggle.
 - **Offline single-file builds** — the entire app and dataset inlined into one shareable HTML file.
 

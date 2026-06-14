@@ -18,7 +18,16 @@ Sample-size reliability is the community's #1 complaint and the algorithm team's
 The source does not publish sample sizes → reliability must come from **data depth (months),
 rank coverage, and cross-rank spread** that we already track.
 
-## Increment 1 — Reliability dots on matchup rows  [VALUE: high, RISK: low]
+## Status (2026-06-14)
+- ✅ **Increment 1 — reliability dots** shipped (commit ca9c3d5). Per-chip ●●●/●●○/●○○
+  in v2 + legend + CLI `conf` column. 34 tests pass.
+- ✅ **Increment 2 — usage × win-rate scatter** shipped (commit 42ee17c). New view tab
+  in v2 with Smogon-style quadrants; verified in browser.
+- ⏳ **Increment 3 — merge web/ into v2** still pending (the big refactor). v2 now has
+  3 view tabs (Matchups / Sub finder / Usage × Win) — the tab shell exists; folding v1's
+  bar table in as a "Bars" tab and retiring the separate page is the remaining work.
+
+## Increment 1 — Reliability dots on matchup rows  [VALUE: high, RISK: low]  ✅ DONE
 - `charTable` already returns `nmonths` + `spread` per opponent row.
 - Add pure `reliability({nmonths, nranks, spread})` → `{level:'high'|'med'|'low', score}` to
   **scoring.js AND scoring.py** (parity-tested).
