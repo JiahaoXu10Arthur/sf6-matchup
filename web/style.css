@@ -250,7 +250,7 @@ select:focus-visible, button:focus-visible, input:focus-visible {
 
 .slider-row {
   display: grid;
-  grid-template-columns: 4.8rem 1fr 2.2rem;
+  grid-template-columns: 4.8rem 1fr 2.6rem;
   align-items: center; gap: 0.6rem;
   padding: 0.28rem 0;
 }
@@ -261,12 +261,19 @@ select:focus-visible, button:focus-visible, input:focus-visible {
   color: var(--text);
 }
 
+/* editable numeric value box (tier weights) */
 .slider-row .slider-val {
-  font-family: var(--font-mono);
+  width: 100%; font-family: var(--font-mono);
   font-size: 0.74rem; text-align: right;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
+  color: var(--accent); font-variant-numeric: tabular-nums;
+  background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 4px; padding: 0.12rem 0.25rem;
 }
+.slider-row .slider-val:focus-visible { outline: 1px solid var(--accent); }
+/* hide number spinners */
+.slider-val::-webkit-outer-spin-button, .slider-val::-webkit-inner-spin-button,
+.opp-val::-webkit-outer-spin-button, .opp-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.slider-val, .opp-val { -moz-appearance: textfield; }
 
 /* month weights — active-only stepper list + add picker */
 #month-sliders { display: flex; flex-direction: column; gap: 4px; }
@@ -360,8 +367,16 @@ input[type="range"]::-moz-range-thumb {
 }
 .opp-w .opp-val {
   font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700;
-  color: var(--text-dim); min-width: 0.8rem; text-align: center;
+  color: var(--text-dim); width: 2rem; text-align: center;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 3px; padding: 0.05rem 0.1rem;
 }
+.opp-w .opp-val:focus-visible { outline: 1px solid var(--accent); }
+.opp-w .opp-usage {
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--adv);
+  min-width: 2.4rem; text-align: right;
+}
+.opp-w .opp-usage:empty { display: none; }
 .opp-step {
   font-family: var(--font-mono); font-size: 0.8rem; line-height: 1;
   width: 1.1rem; height: 1.1rem; padding: 0;

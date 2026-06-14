@@ -92,6 +92,15 @@ function usageMap() {
   return usageWeights(usageRates(usageCsv, active, 36));
 }
 
+// refresh the per-opponent usage badges (live on toggle / month change)
+function paintUsageBadges() {
+  const usage = usageMap();
+  document.querySelectorAll('#exclude-chips .opp-w').forEach(el => {
+    const uw = usage ? usage[el.dataset.char] : null;
+    el.querySelector('.opp-usage').textContent = uw == null ? '' : '×' + uw.toFixed(2);
+  });
+}
+
 /* ---------- controls ---------- */
 
 function buildCharSelect() {
@@ -107,10 +116,13 @@ function buildCharSelect() {
   sel.value = state.char;
 }
 
-// per-opponent weight steppers: 0 = exclude, 1 = normal, 2-3 = target
+// per-opponent weight: 0 = exclude, 1 = normal, >1 = target. Value is directly
+// editable (type a number) plus ± steppers; when usage weighting is on, each row
+// also shows that opponent's usage weight (√ of play rate).
 function buildOppWeights() {
   const box = $('#exclude-chips');
   box.textContent = '';
+  const usage = usageMap();   // {char: usage weight} or null
   const present = new Set(Object.keys(idx));
   const ordered = ROSTER_ORDER.filter(c => present.has(c));
   for (const c of [...ordered, ...[...present].filter(c => !ordered.includes(c))]) {
@@ -119,39 +131,53 @@ function buildOppWeights() {
     el.dataset.char = c;
     el.innerHTML = `<button class="opp-step" data-d="-1" aria-label="decrease">−</button>
       <span class="opp-name">${cn(c)}</span>
-      <span class="opp-val"></span>
-      <button class="opp-step" data-d="1" aria-label="increase">+</button>`;
-    const valEl = el.querySelector('.opp-val');
+      <input class="opp-val" type="number" min="0" step="0.1" aria-label="${cn(c)} weight">
+      <button class="opp-step" data-d="1" aria-label="increase">+</button>
+      <span class="opp-usage" title="${t('usageWeight')}"></span>`;
+    const inp = el.querySelector('.opp-val');
+    const usageEl = el.querySelector('.opp-usage');
     const paint = () => {
       const w = state.oppW[c] ?? 1;
-      valEl.textContent = w;
+      inp.value = w;
       el.classList.toggle('excluded', w === 0);
       el.classList.toggle('targeted', w > 1);
+      const uw = usage ? usage[c] : null;
+      usageEl.textContent = uw == null ? '' : '×' + uw.toFixed(2);
     };
+    const setW = w => {
+      w = Math.round(Math.max(0, w) * 100) / 100;
+      if (w === 1) delete state.oppW[c]; else state.oppW[c] = w;
+      paint();
+      render();
+    };
+    inp.addEventListener('change', () => setW(parseFloat(inp.value) || 0));
     el.querySelectorAll('.opp-step').forEach(btn =>
-      btn.addEventListener('click', () => {
-        const w = Math.max(0, Math.min(3, (state.oppW[c] ?? 1) + Number(btn.dataset.d)));
-        if (w === 1) delete state.oppW[c]; else state.oppW[c] = w;
-        paint();
-        render();
-      }));
+      btn.addEventListener('click', () => setW((state.oppW[c] ?? 1) + Number(btn.dataset.d))));
     paint();
     box.appendChild(el);
   }
 }
 
+// slider + a directly-editable number box (each syncs the other)
 function sliderRow(name, value, max, step, onInput) {
   const row = document.createElement('div');
   row.className = 'slider-row';
   row.innerHTML = `<span class="slider-name">${name}</span>
-    <input type="range" min="0" max="${max}" step="${step}" value="${value}"
+    <input class="slider-range" type="range" min="0" max="${max}" step="${step}" value="${value}"
            aria-label="${name} weight">
-    <span class="slider-val">${value}</span>`;
-  const input = row.querySelector('input');
-  const val = row.querySelector('.slider-val');
-  input.addEventListener('input', () => {
-    val.textContent = input.value;
-    onInput(parseFloat(input.value));
+    <input class="slider-val" type="number" min="0" step="${step}" value="${value}"
+           aria-label="${name} weight value">`;
+  const range = row.querySelector('.slider-range');
+  const num = row.querySelector('.slider-val');
+  range.addEventListener('input', () => {
+    num.value = range.value;
+    onInput(parseFloat(range.value));
+  });
+  num.addEventListener('change', () => {
+    const v = Math.max(0, parseFloat(num.value) || 0);
+    num.value = v;
+    range.value = Math.min(v, max);   // slider caps at max; typed value can exceed it
+    onInput(v);
   });
   return row;
 }
@@ -337,6 +363,7 @@ function render() {
   document.body.classList.toggle('view-match', state.view === 'match');
   document.body.classList.toggle('view-subs', state.view === 'subs');
   updateTierState();
+  paintUsageBadges();
   if (state.view === 'match') renderMatchups(); else renderSubs();
 }
 
