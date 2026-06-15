@@ -1031,7 +1031,8 @@ function subRow(r, i, cover, maxAbs) {
 
 function renderSubs() {
   $('#reliab-legend').hidden = true;
-  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW, usageMap());
+  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(),
+    state.tierW, state.oppW, activeUsage(state.char), personalActive() ? activeRow(state.char) : undefined);
   const cover = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
   const sortVal = r => state.subSort === 'spec' ? r.spec
     : state.subSort === 'str' ? r.strength : cover(r);
@@ -1056,6 +1057,9 @@ function renderSubs() {
     worst3: worst3.map(o => `<b>${cn(o)}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
     metric: `${t('hCover')}${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
+  if (personalActive() && !Object.keys(aggregate(state.personalRows, state.char)).length) {
+    $('#caption').innerHTML += ` <b>${t('personalNoGames', { char: cn(state.char) })}</b>`;
+  }
 
   if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('tierEmpty')}</div>`; return; }
   const maxAbs = Math.max(0.05, ...ranked.map(r => Math.abs(cover(r))));
