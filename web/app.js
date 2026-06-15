@@ -935,16 +935,23 @@ function importRosterFile(file) {
     try { data = JSON.parse(String(reader.result)); } catch (e) { scoutMsg(t('rosterBadFile'), true); render(); return; }
     if (data.version !== 1 || !Array.isArray(data.profiles)) { scoutMsg(t('rosterBadFile'), true); render(); return; }
     const incoming = {};
+    let imported = 0;
     for (const p of data.profiles) {
-      if (!p || p.cfnId == null) continue;   // skip malformed entries
-      // sanitize imported rows the same way pulls are — keep crafted data out of the DOM
-      incoming[String(p.cfnId)] = { ...p, cfnId: String(p.cfnId), rows: validRows(p.rows, ROSTER_NAMES()) };
+      const id = p && p.cfnId != null ? safeId(p.cfnId) : null;
+      if (id == null) continue;            // skip malformed / prototype-polluting ids
+      // rebuild a clean profile — don't trust shapes/types; sanitize rows + coerce timestamps
+      incoming[id] = {
+        cfnId: id, name: String(p.name || id), isSelf: !!p.isSelf,
+        rows: validRows(p.rows, ROSTER_NAMES()),
+        createdAt: Number(p.createdAt) || 0, updatedAt: Number(p.updatedAt) || 0,
+      };
+      imported++;
     }
     state.roster = mergeRosters(state.roster, incoming);
     for (const id of Object.keys(state.roster)) saveProfile(state.roster[id]);  // persist merged
     if (!state.activeProfileId) state.activeProfileId = rosterList()[0]?.cfnId || null;
     if (state.activeProfileId) { const tg = $('#personal-toggle'); if (tg) tg.disabled = false; }
-    scoutMsg(t('rosterImported', { n: data.profiles.length }));
+    scoutMsg(t('rosterImported', { n: imported }));   // actual count imported, not file length
     render();
   };
   reader.onerror = () => { scoutMsg(t('rosterBadFile'), true); render(); };
@@ -974,8 +981,8 @@ function rosterManageHtml() {
       <span class="rm-id">${escapeHtml(p.cfnId)}</span>
       <span class="rm-count">${p.rows.length}</span>
       <span class="rm-span">${span}</span>
-      <button class="rm-self ${p.isSelf ? 'on' : ''}" title="${t('rosterSelf')}">★</button>
-      <button class="rm-del" title="${t('rosterDelete')}">✕</button>
+      <button class="rm-self ${p.isSelf ? 'on' : ''}" title="${t('rosterSelf')}" aria-label="${t('rosterSelf')}">★</button>
+      <button class="rm-del" title="${t('rosterDelete')}" aria-label="${t('rosterDelete')}">✕</button>
     </div>`;
   }).join('');
   return `<div class="roster-manage">

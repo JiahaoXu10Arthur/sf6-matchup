@@ -155,13 +155,28 @@ function newProfile(cfnId, name, isSelf, rows, now) {
            rows: rows.slice(), createdAt: now, updatedAt: now };
 }
 
+// reject keys that would pollute an object's prototype (`__proto__`/`constructor`/
+// `prototype`) when used as a roster key. CFN ids are numeric, so legit ids never match.
+// Returns the string id, or null if unsafe.
+function safeId(id) {
+  const s = String(id);
+  return (s === '__proto__' || s === 'constructor' || s === 'prototype') ? null : s;
+}
+
 // route a parsed pull ({owner,name,isSelf,rows}) into the roster: create a new profile
-// or merge-dedupe into the existing one by CFN id. Returns {roster, activeId} (immutable).
+// or merge-dedupe into the existing one by CFN id. Returns {roster, activeId} (immutable;
+// activeId null if the owner is an unsafe key). A pull never clobbers a manual rename — it
+// only fills in the fighter name while the profile still has its default (id) name; isSelf
+// only ever flips on.
 function routePull(roster, payload, now) {
-  const id = String(payload.owner);
+  const id = safeId(payload.owner);
+  if (id == null) return { roster, activeId: null };
   const ex = roster[id];
   const profile = ex
-    ? { ...ex, rows: mergeRows(ex.rows, payload.rows), updatedAt: now }
+    ? { ...ex, rows: mergeRows(ex.rows, payload.rows),
+        name: (ex.name && ex.name !== ex.cfnId) ? ex.name : (payload.name || ex.name),
+        isSelf: ex.isSelf || !!payload.isSelf,
+        updatedAt: now }
     : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
   return { roster: { ...roster, [id]: profile }, activeId: id };
 }
@@ -171,13 +186,15 @@ function routePull(roster, payload, now) {
 function mergeRosters(base, incoming) {
   const out = { ...base };
   for (const id of Object.keys(incoming)) {
+    if (safeId(id) == null) continue;          // never merge under a prototype-polluting key
     const inc = incoming[id], cur = out[id];
+    const incU = Number(inc.updatedAt) || 0, curU = cur ? (Number(cur.updatedAt) || 0) : 0;
     out[id] = cur
       ? { ...cur, rows: mergeRows(cur.rows, inc.rows),
-          name: inc.updatedAt > cur.updatedAt ? inc.name : cur.name,
+          name: incU > curU ? inc.name : cur.name,
           isSelf: cur.isSelf || inc.isSelf,
-          updatedAt: Math.max(cur.updatedAt, inc.updatedAt) }
-      : inc;
+          updatedAt: Math.max(curU, incU) }
+      : { ...inc, updatedAt: incU };
   }
   return out;
 }
@@ -389,7 +406,7 @@ if (typeof module !== 'undefined') {
     KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB,
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
-    monthOf, newProfile, routePull, mergeRosters,
+    monthOf, newProfile, routePull, mergeRosters, safeId,
     buildOfficialMap, officialName, parseBattlelog, parsePayload,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };

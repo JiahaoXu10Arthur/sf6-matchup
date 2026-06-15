@@ -10,5 +10,6 @@ else if (mode === 'routePull') out = s.routePull(arg.roster, arg.payload, arg.no
 else if (mode === 'mergeRosters') out = s.mergeRosters(arg.base, arg.incoming);
 else if (mode === 'aggregate') out = s.aggregate(arg.rows, arg.char, arg.monthW);
 else if (mode === 'parsePayload') out = s.parsePayload(arg.payload, arg.names);
+else if (mode === 'safeId') out = s.safeId(arg.id);
 else throw new Error('unknown mode ' + mode);
 console.log(JSON.stringify(out));

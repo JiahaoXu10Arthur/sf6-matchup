@@ -73,3 +73,52 @@ def test_parse_payload_returns_name_and_isself():
     payload = {'owner': 5, 'name': 'me', 'isSelf': True, 'replays': []}
     res = run('parsePayload', {'payload': payload, 'names': ['KEN']})
     assert res['owner'] == 5 and res['name'] == 'me' and res['isSelf'] is True and res['rows'] == []
+
+
+# --- PR #3 Copilot review hardening ---
+
+def test_safe_id_rejects_dangerous_keys():
+    for bad in ('__proto__', 'constructor', 'prototype'):
+        assert run('safeId', {'id': bad}) is None
+    assert run('safeId', {'id': 3400122682}) == '3400122682'
+    assert run('safeId', {'id': 'csv-import'}) == 'csv-import'
+
+
+def test_route_pull_rejects_dangerous_owner_key():
+    payload = {'owner': '__proto__', 'name': 'x', 'isSelf': False,
+               'rows': [{'replay_id': 'A', 'date': '1', 'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '', 'result': 'W'}]}
+    res = run('routePull', {'roster': {}, 'payload': payload, 'now': 100})
+    assert res['activeId'] is None
+    assert res['roster'] == {}          # nothing added under a dangerous key
+
+
+def test_route_pull_self_names_default_profile_on_merge():
+    existing = {'5': {'cfnId': '5', 'name': '5', 'isSelf': False, 'createdAt': 1, 'updatedAt': 1,
+                'rows': [{'replay_id': 'A', 'date': '1', 'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '', 'result': 'W'}]}}
+    payload = {'owner': 5, 'name': 'Kincho', 'isSelf': True,
+               'rows': [{'replay_id': 'B', 'date': '2', 'your_char': 'TERRY', 'opp_char': 'RYU', 'rank_mr': '', 'result': 'L'}]}
+    res = run('routePull', {'roster': existing, 'payload': payload, 'now': 200})
+    p = res['roster']['5']
+    assert p['name'] == 'Kincho'        # default name (== id) adopts the pull's fighter name
+    assert p['isSelf'] is True          # isSelf flips on
+
+
+def test_route_pull_preserves_custom_name_and_keeps_self():
+    existing = {'5': {'cfnId': '5', 'name': 'MyAlias', 'isSelf': True, 'createdAt': 1, 'updatedAt': 1,
+                'rows': [{'replay_id': 'A', 'date': '1', 'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '', 'result': 'W'}]}}
+    payload = {'owner': 5, 'name': 'Whatever', 'isSelf': False,
+               'rows': [{'replay_id': 'B', 'date': '2', 'your_char': 'TERRY', 'opp_char': 'RYU', 'rank_mr': '', 'result': 'L'}]}
+    res = run('routePull', {'roster': existing, 'payload': payload, 'now': 200})
+    p = res['roster']['5']
+    assert p['name'] == 'MyAlias'       # manual rename never clobbered by a pull
+    assert p['isSelf'] is True          # once self, stays self
+
+
+def test_merge_rosters_coerces_missing_updatedat_to_number():
+    base = {'1': {'cfnId': '1', 'name': 'a', 'isSelf': False, 'createdAt': 1, 'updatedAt': 5,
+                  'rows': [{'replay_id': 'A', 'result': 'W', 'your_char': 'T', 'opp_char': 'K', 'date': '1', 'rank_mr': ''}]}}
+    incoming = {'1': {'cfnId': '1', 'name': 'b', 'isSelf': False, 'createdAt': 1,   # no updatedAt
+                  'rows': [{'replay_id': 'B', 'result': 'L', 'your_char': 'T', 'opp_char': 'R', 'date': '2', 'rank_mr': ''}]}}
+    res = run('mergeRosters', {'base': base, 'incoming': incoming})
+    assert res['1']['updatedAt'] == 5   # max(5, 0); a NaN would serialize to null and fail this
+    assert len(res['1']['rows']) == 2

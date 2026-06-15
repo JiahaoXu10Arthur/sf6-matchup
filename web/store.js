@@ -8,7 +8,10 @@ const SCOUT_STORE = 'profiles';
 function _openScoutDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(SCOUT_DB, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(SCOUT_STORE, { keyPath: 'cfnId' });
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(SCOUT_STORE)) db.createObjectStore(SCOUT_STORE, { keyPath: 'cfnId' });
+    };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
@@ -21,7 +24,7 @@ async function loadRoster() {
   return new Promise((resolve, reject) => {
     const req = db.transaction(SCOUT_STORE, 'readonly').objectStore(SCOUT_STORE).getAll();
     req.onsuccess = () => {
-      const out = {};
+      const out = Object.create(null);   // null-proto: user-derived ids can't pollute via __proto__
       for (const p of req.result) out[p.cfnId] = p;
       resolve(out);
     };
