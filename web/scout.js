@@ -130,14 +130,56 @@ function classify(p0, wins, losses, opts = {}) {
   return { shrunk: mean, lo, hi, probBelow: pb, n, verdict, deficit: (p0 - mean) * pb };
 }
 
-// {opponent: [wins, losses]} for the games you played as `char`.
-function aggregate(rows, char) {
+// {opponent: [wins, losses]} for games played as `char`. When monthW is given, a
+// match counts only if its month (from its `date`) has weight > 0 (whole-game filter,
+// not fractional) — so "current"/"all" profiles apply to the personal record too.
+function aggregate(rows, char, monthW) {
   const wl = {};
   for (const row of rows) {
     if (row.your_char !== char) continue;
+    if (monthW && !(monthW[monthOf(row.date)] > 0)) continue;
     (wl[row.opp_char] ??= [0, 0])[row.result === 'W' ? 0 : 1]++;
   }
   return wl;
+}
+
+// epoch-seconds (string or number) -> 'YYYYMM' in UTC, matching the matrix month keys.
+function monthOf(date) {
+  const d = new Date(Number(date) * 1000);
+  return '' + d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+
+// a fresh profile record
+function newProfile(cfnId, name, isSelf, rows, now) {
+  return { cfnId: String(cfnId), name: name || String(cfnId), isSelf: !!isSelf,
+           rows: rows.slice(), createdAt: now, updatedAt: now };
+}
+
+// route a parsed pull ({owner,name,isSelf,rows}) into the roster: create a new profile
+// or merge-dedupe into the existing one by CFN id. Returns {roster, activeId} (immutable).
+function routePull(roster, payload, now) {
+  const id = String(payload.owner);
+  const ex = roster[id];
+  const profile = ex
+    ? { ...ex, rows: mergeRows(ex.rows, payload.rows), updatedAt: now }
+    : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
+  return { roster: { ...roster, [id]: profile }, activeId: id };
+}
+
+// merge an imported roster into a base roster: per-profile dedupe by replay_id; the
+// newer updatedAt wins the name; max updatedAt kept.
+function mergeRosters(base, incoming) {
+  const out = { ...base };
+  for (const id of Object.keys(incoming)) {
+    const inc = incoming[id], cur = out[id];
+    out[id] = cur
+      ? { ...cur, rows: mergeRows(cur.rows, inc.rows),
+          name: inc.updatedAt > cur.updatedAt ? inc.name : cur.name,
+          isSelf: cur.isSelf || inc.isSelf,
+          updatedAt: Math.max(cur.updatedAt, inc.updatedAt) }
+      : inc;
+  }
+  return out;
 }
 
 // Your most-played character across the parsed rows (null if none).
@@ -253,17 +295,21 @@ function parseBattlelog(nextData, myShortId, names) {
   return out;
 }
 
-// Accept either a full __NEXT_DATA__ dict (single battlelog page) or the compact
-// {owner, replays} blob the bookmarklet produces, and return parsed rows. The
-// owner short_id is read from the page when present, else from the blob.
+// Accept a full __NEXT_DATA__ dict or the compact {owner,name,isSelf,replays} blob and
+// return {owner, name, isSelf, rows}. Older {owner,replays} blobs still parse.
 function parsePayload(payload, names) {
   if (payload?.props?.pageProps?.replay_list) {
-    const owner = payload.props.pageProps.fighter_banner_info?.personal_info?.short_id;
-    return parseBattlelog(payload, owner, names);
+    const pp = payload.props.pageProps;
+    const owner = pp.fighter_banner_info?.personal_info?.short_id;
+    const name = pp.fighter_banner_info?.personal_info?.fighter_id || String(owner);
+    const isSelf = pp.common?.loginUser?.shortId != null
+      && Number(pp.common.loginUser.shortId) === Number(owner);
+    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names) };
   }
   if (payload?.owner != null && Array.isArray(payload.replays)) {
     const nd = { props: { pageProps: { replay_list: payload.replays } } };
-    return parseBattlelog(nd, payload.owner, names);
+    return { owner: payload.owner, name: payload.name || String(payload.owner),
+             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names) };
   }
   throw new Error('unrecognized battlelog payload');
 }
@@ -343,6 +389,7 @@ if (typeof module !== 'undefined') {
     KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB,
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
+    monthOf, newProfile, routePull, mergeRosters,
     buildOfficialMap, officialName, parseBattlelog, parsePayload,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
