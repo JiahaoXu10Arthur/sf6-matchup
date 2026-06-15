@@ -1044,6 +1044,16 @@ function scoutPocketCell(r) {
     : `<span class="sc-pocket">${t('scoutNoPocket')}</span>`;
 }
 
+// per-opponent personal win-rate split at the patch month: {pre, post, delta} or null
+// (null unless the active profile has games on BOTH sides of PATCH_MONTH).
+function personalPatchSplit(opp) {
+  const rows = activeRows().filter(r => r.your_char === state.char && r.opp_char === opp);
+  const side = which => { const g = rows.filter(r => which(monthOf(r.date))); const w = g.filter(r => r.result === 'W').length; return g.length ? w / g.length : null; };
+  const pre = side(m => m < PATCH_MONTH), post = side(m => m > PATCH_MONTH);
+  if (pre == null || post == null) return null;
+  return { pre, post, delta: post - pre };
+}
+
 function scoutTableHtml(results) {
   const pct = p => (p * 100).toFixed(1) + '%';
   const head = `<div class="sc-row sc-head">
@@ -1052,6 +1062,7 @@ function scoutTableHtml(results) {
     <span class="sc-raw">${t('scoutRaw')}</span>
     <span class="sc-shrunk">${t('scoutShrunk')}</span>
     <span class="sc-base">${t('scoutBaseline')}</span>
+    <span class="sc-dpatch" title="${t('scoutDpatchHint')}">${t('scoutDpatch')}</span>
     <span class="sc-verd">${t('scoutVerdict')}</span>
     <span class="sc-pocket">${t('scoutPocket')}</span>
   </div>`;
@@ -1063,6 +1074,9 @@ function scoutTableHtml(results) {
       <span class="sc-raw">${pct(raw)}</span>
       <span class="sc-shrunk">${pct(r.shrunk)} <small>[${pct(r.lo)}–${pct(r.hi)}]</small></span>
       <span class="sc-base">${pct(r.baseline)}</span>
+      ${(() => { const sp = personalPatchSplit(r.opp); return sp
+        ? `<span class="sc-dpatch ${sp.delta >= 0 ? 'up' : 'dn'}">${(sp.delta * 100 >= 0 ? '+' : '') + (sp.delta * 100).toFixed(0)}%</span>`
+        : `<span class="sc-dpatch">—</span>`; })()}
       <span class="sc-verd">${scoutVerdictCell(r.verdict)}</span>
       ${scoutPocketCell(r)}
     </button>`;
