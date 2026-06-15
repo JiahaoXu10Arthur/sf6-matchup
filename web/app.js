@@ -113,7 +113,7 @@ function applyI18n() {
     : state.view === 'subs' ? 'labelSubs'
     : state.view === 'scatter' ? 'labelScatter'
     : state.view === 'threats' ? 'labelThreats'
-    : state.view === 'scout' ? 'labelScout' : 'labelMatch');
+    : state.view === 'scout' ? 'labelScout' : state.view === 'trend' ? 'labelTrend' : 'labelMatch');
   $('#char-name').textContent = cn(state.char);
   setAvatar($('#char-avatar'), state.char);
   document.querySelectorAll('#char-select option').forEach(o => o.textContent = cn(o.value));
@@ -500,7 +500,7 @@ function wireControls() {
 
 /* ---------- tier rendering ---------- */
 
-const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter', threats: 'labelThreats', scout: 'labelScout' };
+const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter', threats: 'labelThreats', scout: 'labelScout', trend: 'labelTrend' };
 
 function render() {
   closeCharCard();
@@ -511,6 +511,7 @@ function render() {
   else if (state.view === 'scatter') renderScatter();
   else if (state.view === 'threats') renderThreats();
   else if (state.view === 'scout') renderScout();
+  else if (state.view === 'trend') renderTrend();
   else renderSubs();
 }
 
@@ -1082,6 +1083,29 @@ function scoutTableHtml(results) {
     </button>`;
   }).join('');
   return `<div class="sc-table">${head}${rows}</div>`;
+}
+
+// per-month win-rate line for the active profile (overall), reusing the scatter SVG styles.
+function renderTrend() {
+  $('#reliab-legend').hidden = true; $('#hero-summary').innerHTML = '';
+  const rows = activeRows();
+  if (!rows.length) { $('#caption').innerHTML = t('trendNone'); $('#lanes').innerHTML = `<div class="lane-empty">${t('trendNone')}</div>`; return; }
+  const byMonth = {};
+  for (const r of rows) { if (r.your_char !== state.char) continue; const m = monthOf(r.date); (byMonth[m] ??= [0, 0])[r.result === 'W' ? 0 : 1]++; }
+  const months = Object.keys(byMonth).sort();
+  $('#caption').innerHTML = t('trendCaption', { char: cn(state.char) });
+  if (months.length < 2) { $('#lanes').innerHTML = `<div class="lane-empty">${t('trendThin')}</div>`; return; }
+  const W = 860, H = 420, m = { l: 48, r: 24, t: 28, b: 44 };
+  const pts = months.map((mo, i) => { const [w, l] = byMonth[mo]; return { mo, x: i, win: (w + l) ? w / (w + l) * 100 : 50, n: w + l }; });
+  const px = i => m.l + i / (months.length - 1) * (W - m.l - m.r);
+  const py = v => H - m.b - v / 100 * (H - m.t - m.b);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${px(p.x).toFixed(1)},${py(p.win).toFixed(1)}`).join(' ');
+  const dots = pts.map(p => `<g class="pt"><circle cx="${px(p.x)}" cy="${py(p.win)}" r="${4 + Math.min(6, p.n / 5)}"/><title>${p.mo}: ${p.win.toFixed(1)}% (${p.n})</title></g>`).join('');
+  const xlabels = pts.map(p => `<text class="tick" x="${px(p.x)}" y="${H - m.b + 16}" text-anchor="middle">${p.mo.replace(/(\d{4})(\d{2})/, '$1.$2')}</text>`).join('');
+  const ylabels = [0, 25, 50, 75, 100].map(v => `<line class="grid" x1="${m.l}" y1="${py(v)}" x2="${W - m.r}" y2="${py(v)}"/><text class="tick" x="${m.l - 8}" y="${py(v) + 4}" text-anchor="end">${v}%</text>`).join('');
+  $('#lanes').innerHTML = `<div class="scatter-wrap"><svg class="scatter trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${t('labelTrend')}">
+    ${ylabels}<line class="axis-ref" x1="${m.l}" y1="${py(50)}" x2="${W - m.r}" y2="${py(50)}"/>
+    <path class="trend-line" d="${line}" fill="none"/>${dots}${xlabels}</svg></div>`;
 }
 
 function renderScout() {

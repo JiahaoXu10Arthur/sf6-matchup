@@ -718,3 +718,7 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .rm-self, .rm-del { background: transparent; border: 1px solid var(--line); border-radius: 5px; color: var(--text-dim); cursor: pointer; }
 .rm-self.on { color: var(--t-adv); border-color: var(--t-adv); }
 .rm-del:hover { color: var(--t-dis); border-color: var(--t-dis); }
+
+/* trend (over-time) line chart — reuses .scatter tick/grid/axis-ref/pt styles */
+.scatter.trend .trend-line { stroke: var(--accent); stroke-width: 2.5; }
+.scatter.trend .pt circle { fill: var(--accent); }
