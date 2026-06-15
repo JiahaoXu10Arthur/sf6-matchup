@@ -689,21 +689,39 @@ function renderScatter() {
 function renderThreats() {
   $('#reliab-legend').hidden = true;
   const ex = exclude();
-  const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
-  const table = charTable(idx, state.char, state.monthW, ex, state.tierW, PATCH_MONTH);
-  const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
   const pts = [];
-  for (const r of table) {
-    const v = metric(r);
-    if (v == null || rates[r.opp] == null) continue;
-    const win = v * 10, rel = reliability(r.nmo, r.nranks, r.spread).score;
-    pts.push({
-      char: r.opp, x: rates[r.opp], y: win, size: rel, cls: winCls(win),
-      title: `${cn(r.opp)} · ${rates[r.opp].toFixed(1)}% ${t('threatFaced')} · ${win.toFixed(2)}% ${t('ccWin')}`,
-    });
+  if (personalActive()) {
+    // personal: x = your encounter share, y = your shrunk win-rate, size = your sample
+    const row = personalRow(idx, state.char, state.monthW, ex, state.tierW, aggregate(state.personalRows, state.char));
+    const enc = personalEncounter(state.personalRows, state.char);
+    const totalGames = Object.values(enc).reduce((s, n) => s + n, 0);
+    const maxN = Math.max(1, ...Object.values(enc));
+    for (const opp of Object.keys(row)) {
+      const win = row[opp] * 10, n = enc[opp] || 0;
+      pts.push({
+        char: opp, x: totalGames ? n / totalGames * 100 : 0, y: win, size: n / maxN, cls: winCls(win),
+        title: `${cn(opp)} · ${n} ${t('scoutMatches')} · ${win.toFixed(2)}% ${t('ccWin')}`,
+      });
+    }
+    $('#hero-summary').innerHTML = '';
+    $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) })
+      + (totalGames === 0 ? ` <b>${t('personalNoGames', { char: cn(state.char) })}</b>` : '');
+  } else {
+    const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
+    const table = charTable(idx, state.char, state.monthW, ex, state.tierW, PATCH_MONTH);
+    const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
+    for (const r of table) {
+      const v = metric(r);
+      if (v == null || rates[r.opp] == null) continue;
+      const win = v * 10, rel = reliability(r.nmo, r.nranks, r.spread).score;
+      pts.push({
+        char: r.opp, x: rates[r.opp], y: win, size: rel, cls: winCls(win),
+        title: `${cn(r.opp)} · ${rates[r.opp].toFixed(1)}% ${t('threatFaced')} · ${win.toFixed(2)}% ${t('ccWin')}`,
+      });
+    }
+    $('#hero-summary').innerHTML = '';
+    $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) });
   }
-  $('#hero-summary').innerHTML = '';
-  $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) });
   if (pts.length < 2) { $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`; return; }
   buildScatter(pts, {
     axisX: 'threatAxisUsage', axisY: 'threatAxisWin', aria: 'labelThreats',
