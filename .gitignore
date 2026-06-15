@@ -12,3 +12,9 @@ data/personal/
 
 # personal scout reports stay local
 output/*_scout.md
+
+# internal design docs (specs, plans, feasibility, findings, ideas, reviews) — working
+# notes, not shipped content. Only the METHOD methodology docs are real deliverables.
+docs/*
+!docs/METHOD.md
+!docs/METHOD.zh-CN.md
