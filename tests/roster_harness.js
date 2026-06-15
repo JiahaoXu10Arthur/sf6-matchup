@@ -11,5 +11,8 @@ else if (mode === 'mergeRosters') out = s.mergeRosters(arg.base, arg.incoming);
 else if (mode === 'aggregate') out = s.aggregate(arg.rows, arg.char, arg.monthW);
 else if (mode === 'parsePayload') out = s.parsePayload(arg.payload, arg.names);
 else if (mode === 'safeId') out = s.safeId(arg.id);
+else if (mode === 'skillMatchedAgg') out = s.skillMatchedAgg(arg.rows, arg.char, arg.opts);
+else if (mode === 'diagnoseFromBaseline') out = s.diagnoseFromBaseline(arg.baseline, arg.agg);
+else if (mode === 'prioritize') out = s.prioritize(arg.diagnoses, arg.usage);
 else throw new Error('unknown mode ' + mode);
 console.log(JSON.stringify(out));

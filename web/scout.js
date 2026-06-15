@@ -255,6 +255,59 @@ function scout(personalAgg, baseline) {
   return results;
 }
 
+/* ---------- coach: diagnosis + priority (joins personal record to the baseline) ---------- */
+
+// Gaussian MR-proximity weight: a fair match (opponent MR ≈ yours) counts fully; a blowout
+// mismatch is down-weighted toward zero. Unknown/blank MR on either side -> neutral 1.
+const MR_BANDWIDTH = 200;
+function _mrWeight(rankMr, oppMr, band) {
+  const a = Number(rankMr), b = Number(oppMr);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || rankMr === '' || oppMr === '') return 1;
+  return Math.exp(-0.5 * ((Math.abs(a - b) / band) ** 2));
+}
+
+// {opp: [weightedWins, weightedLosses]} for games played as `char`, each game weighted by
+// how skill-matched it was. Weighted counts may be fractional (classify accepts that).
+function skillMatchedAgg(rows, char, opts = {}) {
+  const band = opts.bandwidth ?? MR_BANDWIDTH;
+  const wl = {};
+  for (const row of rows) {
+    if (row.your_char !== char) continue;
+    const w = _mrWeight(row.rank_mr, row.opp_mr, band);
+    (wl[row.opp_char] ??= [0, 0])[row.result === 'W' ? 0 : 1] += w;
+  }
+  return wl;
+}
+
+// Join the weighted personal record (agg) to the global baseline ({opp: 0..1}) and classify
+// each matchup. Splits the gap into personalGap (you below the field) and universalHardness
+// (the matchup is hard for everyone — already encoded in the baseline).
+function diagnoseFromBaseline(baseline, agg) {
+  const out = [];
+  for (const opp of Object.keys(baseline)) {
+    const p0 = baseline[opp];
+    const [w, l] = agg[opp] || [0, 0];
+    const c = classify(p0, w, l);
+    out.push({
+      opp, baseline: p0, shrunk: c.shrunk, lo: c.lo, hi: c.hi,
+      probBelow: c.probBelow, n: c.n, deficit: c.deficit, verdict: c.verdict,
+      personalGap: Math.max(0, p0 - c.shrunk),
+      universalHardness: Math.max(0, 0.5 - p0),
+    });
+  }
+  return out;
+}
+
+// Rank diagnoses by expected return = frequency × personalGap × confidence. classify's
+// deficit already equals (baseline - shrunk) * probBelow, so the score is usage * max(0, deficit)
+// (overperformance never scores). usage: {opp: frequency} (missing -> 1).
+function prioritize(diagnoses, usage) {
+  const u = usage || {};
+  return diagnoses
+    .map(d => ({ ...d, score: (u[d.opp] ?? 1) * Math.max(0, d.deficit) }))
+    .sort((a, b) => b.score - a.score);
+}
+
 /* ---------- battlelog parsing (port of fetch_battlelog.parse_battlelog) ---------- */
 
 // Punctuation/space-insensitive uppercase key (E.Honda / E. HONDA -> EHONDA).
@@ -407,6 +460,7 @@ if (typeof module !== 'undefined') {
     KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB,
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
+    skillMatchedAgg, diagnoseFromBaseline, prioritize,
     monthOf, newProfile, routePull, mergeRosters, safeId,
     buildOfficialMap, officialName, parseBattlelog, parsePayload,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
