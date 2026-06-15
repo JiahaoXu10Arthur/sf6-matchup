@@ -914,6 +914,74 @@ function downloadScoutCsv() {
   URL.revokeObjectURL(url);
 }
 
+/* ---------- roster export / import / manage ---------- */
+
+function exportRoster() {
+  const blob = new Blob([JSON.stringify({ version: 1, profiles: Object.values(state.roster) })], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'sf6_scout_roster.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function importRosterFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(String(reader.result)); } catch (e) { scoutMsg(t('rosterBadFile'), true); render(); return; }
+    if (data.version !== 1 || !Array.isArray(data.profiles)) { scoutMsg(t('rosterBadFile'), true); render(); return; }
+    const incoming = {};
+    for (const p of data.profiles) {
+      if (!p || p.cfnId == null) continue;   // skip malformed entries
+      // sanitize imported rows the same way pulls are — keep crafted data out of the DOM
+      incoming[String(p.cfnId)] = { ...p, cfnId: String(p.cfnId), rows: validRows(p.rows, ROSTER_NAMES()) };
+    }
+    state.roster = mergeRosters(state.roster, incoming);
+    for (const id of Object.keys(state.roster)) saveProfile(state.roster[id]);  // persist merged
+    if (!state.activeProfileId) state.activeProfileId = rosterList()[0]?.cfnId || null;
+    if (state.activeProfileId) { const tg = $('#personal-toggle'); if (tg) tg.disabled = false; }
+    scoutMsg(t('rosterImported', { n: data.profiles.length }));
+    render();
+  };
+  reader.onerror = () => { scoutMsg(t('rosterBadFile'), true); render(); };
+  reader.readAsText(file);
+}
+
+function renameProfile(cfnId, name) {
+  const p = state.roster[cfnId]; if (!p) return;
+  state.roster[cfnId] = { ...p, name: name.trim() || p.cfnId, updatedAt: Date.now() };
+  saveProfile(state.roster[cfnId]); render();
+}
+
+function deleteProfile(cfnId) {
+  delete state.roster[cfnId]; deleteProfileFromStore(cfnId);
+  if (state.activeProfileId === cfnId) state.activeProfileId = rosterList()[0]?.cfnId || null;
+  render();
+}
+
+// manage panel: one row per profile (escaped name/id), with rename/self/delete + export/import.
+function rosterManageHtml() {
+  const fmtDate = epoch => monthOf(epoch).replace(/(\d{4})(\d{2})/, '$1.$2');
+  const rows = rosterList().map(p => {
+    const dates = p.rows.map(r => Number(r.date)).filter(Boolean);
+    const span = dates.length ? `${fmtDate(Math.min(...dates))}–${fmtDate(Math.max(...dates))}` : '—';
+    return `<div class="rm-row" data-id="${escapeHtml(p.cfnId)}">
+      <input class="rm-name" value="${escapeHtml(p.name)}" aria-label="name">
+      <span class="rm-id">${escapeHtml(p.cfnId)}</span>
+      <span class="rm-count">${p.rows.length}</span>
+      <span class="rm-span">${span}</span>
+      <button class="rm-self ${p.isSelf ? 'on' : ''}" title="${t('rosterSelf')}">★</button>
+      <button class="rm-del" title="${t('rosterDelete')}">✕</button>
+    </div>`;
+  }).join('');
+  return `<div class="roster-manage">
+    <div class="rm-head"><span>${t('rosterPlayers')}</span>
+      <span class="rm-actions"><button id="rm-export">${t('rosterExport')}</button>
+        <label class="rm-import">${t('rosterImport')}<input type="file" id="rm-import-file" accept=".json" hidden></label></span></div>
+    ${rows || `<p class="lane-empty">${t('rosterEmpty')}</p>`}
+  </div>`;
+}
+
 function scoutInputsHtml(compact) {
   // compact = inline "add more" affordance shown above a loaded table
   return `<div class="scout-inputs ${compact ? 'compact' : ''}">
@@ -1057,7 +1125,7 @@ function renderScout() {
   }
 
   $('#lanes').innerHTML = summary + scoutStatusHtml() +
-    `<div class="sc-addpanel" id="scout-addpanel" hidden>${scoutInputsHtml(true)}</div>` + body;
+    `<div class="sc-addpanel" id="scout-addpanel" hidden>${scoutInputsHtml(true)}${rosterManageHtml()}</div>` + body;
 
   wireScoutInputs();
   wireChips();
@@ -1074,6 +1142,17 @@ function renderScout() {
   $('#scout-dl')?.addEventListener('click', downloadScoutCsv);
   $('#scout-clear')?.addEventListener('click', clearScoutData);
   $('#sc-profile')?.addEventListener('change', e => { state.activeProfileId = e.target.value; const m = mostPlayed(activeRows()); if (m && idx[m]) selectChar(m); else render(); });
+  $('#rm-export')?.addEventListener('click', exportRoster);
+  $('#rm-import-file')?.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) importRosterFile(f); });
+  document.querySelectorAll('#lanes .rm-row').forEach(rowEl => {
+    const id = rowEl.dataset.id;
+    rowEl.querySelector('.rm-name').addEventListener('change', e => renameProfile(id, e.target.value));
+    rowEl.querySelector('.rm-del').addEventListener('click', () => deleteProfile(id));
+    rowEl.querySelector('.rm-self').addEventListener('click', () => {
+      const p = state.roster[id]; state.roster[id] = { ...p, isSelf: !p.isSelf, updatedAt: Date.now() };
+      saveProfile(state.roster[id]); render();
+    });
+  });
 }
 
 function wireScoutInputs() {
