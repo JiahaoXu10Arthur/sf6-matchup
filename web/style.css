@@ -698,3 +698,5 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .chip-personal.even, .col-personal.even { color: var(--text-dim); }
 .bars.personal .nums { grid-template-columns: 3rem 5.4rem 4rem; }
 .bars .col-personal { font-family: var(--font-mono); font-size: 0.74rem; text-align: right; color: var(--text-dim); }
+.scout-method-hint a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.scout-method-hint a:hover { color: var(--text); }

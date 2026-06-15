@@ -763,43 +763,55 @@ function renderThreats() {
 // profile id from the URL, pages your ranked battlelog, and pops a copy box with
 // a compact {owner, replays} JSON to paste into the Scout tab. No regex/quotes
 // nesting so it survives as a template literal; all parsing happens here in-app.
-const SCOUT_BOOKMARKLET = `javascript:(async()=>{try{
+// Build the "Pull my Buckler log" bookmarklet with localized strings baked in
+// (it runs on Buckler's origin, outside our app, so it can't reach our i18n at
+// runtime — we interpolate the current language's strings at drag time). It shows
+// a live progress pill (page p/n) and ends with a copy box.
+function scoutBookmarklet(s) {
+  return `javascript:(async()=>{try{
 var parts=location.pathname.split('/profile/');
 var ndEl=document.getElementById('__NEXT_DATA__');
 var nd=ndEl?JSON.parse(ndEl.textContent):null;
 var owner=(parts[1]?parts[1].split('/')[0]:'')||(nd&&nd.props.pageProps.fighter_banner_info&&nd.props.pageProps.fighter_banner_info.personal_info.short_id);
-if(!owner){alert('Open your Capcom Buckler profile or battlelog page first.');return;}
+if(!owner){alert(${JSON.stringify(s.noProfile)});return;}
 var base='https://www.streetfighter.com/6/buckler/profile/'+owner+'/battlelog/rank?page=';
-var seen={},replays=[];
+var pill=document.createElement('div');
+pill.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:8px;padding:10px 14px;font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45)';
+document.body.appendChild(pill);
+var seen={},replays=[],total=20,shown='?';
 for(var p=1;p<=20;p++){
+pill.textContent=${JSON.stringify(s.progress)}.replace('{p}',p).replace('{n}',shown);
 var html=await fetch(base+p,{credentials:'include'}).then(x=>x.text());
 var doc=new DOMParser().parseFromString(html,'text/html');
 var el=doc.getElementById('__NEXT_DATA__');
 if(!el)break;
-var pnd=JSON.parse(el.textContent);
-var list=(pnd.props&&pnd.props.pageProps&&pnd.props.pageProps.replay_list)||[];
+var pp=JSON.parse(el.textContent).props.pageProps;
+if(p===1&&pp.total_page){total=Math.min(20,pp.total_page);shown=total;pill.textContent=${JSON.stringify(s.progress)}.replace('{p}',p).replace('{n}',shown);}
+var list=(pp.replay_list)||[];
 var fresh=0,i,r;
 for(i=0;i<list.length;i++){r=list[i];if(!seen[r.replay_id]){seen[r.replay_id]=1;replays.push(r);fresh++;}}
-if(!fresh)break;
-await new Promise(z=>setTimeout(z,800));
+if(!fresh||p>=total)break;
+await new Promise(z=>setTimeout(z,500));
 }
-if(!replays.length){alert('No matches found. Make sure you are logged in and on your own battlelog.');return;}
+pill.remove();
+if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
 var blob=JSON.stringify({owner:owner,replays:replays});
 var ov=document.createElement('div');
 ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
 var card=document.createElement('div');
 card.style.cssText='background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:10px;padding:18px;width:min(560px,92vw);font-family:system-ui,sans-serif';
-var h=document.createElement('p');h.textContent='Pulled '+replays.length+' matches. Copy this, then paste it into the Scout tab:';h.style.cssText='margin:0 0 10px;font-size:14px';
+var h=document.createElement('p');h.textContent=${JSON.stringify(s.done)}.replace('{n}',replays.length);h.style.cssText='margin:0 0 10px;font-size:14px';
 var ta=document.createElement('textarea');ta.value=blob;ta.readOnly=true;ta.style.cssText='width:100%;height:120px;font-family:monospace;font-size:11px;background:#0b0e16;color:#eaeef7;border:1px solid #283047;border-radius:6px;padding:8px;box-sizing:border-box';
 var bar=document.createElement('div');bar.style.cssText='margin-top:12px;display:flex;gap:8px;justify-content:flex-end';
-var copy=document.createElement('button');copy.textContent='Copy';copy.style.cssText='padding:7px 16px;border-radius:6px;border:none;background:#6e8bff;color:#0b0e16;font-weight:700;cursor:pointer';
-copy.onclick=function(){ta.select();try{navigator.clipboard.writeText(blob)}catch(e){document.execCommand('copy')}copy.textContent='Copied!'};
-var close=document.createElement('button');close.textContent='Close';close.style.cssText='padding:7px 16px;border-radius:6px;border:1px solid #283047;background:transparent;color:#eaeef7;cursor:pointer';
+var copy=document.createElement('button');copy.textContent=${JSON.stringify(s.copy)};copy.style.cssText='padding:7px 16px;border-radius:6px;border:none;background:#6e8bff;color:#0b0e16;font-weight:700;cursor:pointer';
+copy.onclick=function(){ta.select();try{navigator.clipboard.writeText(blob)}catch(e){document.execCommand('copy')}copy.textContent=${JSON.stringify(s.copied)};};
+var close=document.createElement('button');close.textContent=${JSON.stringify(s.close)};close.style.cssText='padding:7px 16px;border-radius:6px;border:1px solid #283047;background:transparent;color:#eaeef7;cursor:pointer';
 close.onclick=function(){ov.remove()};
 bar.appendChild(copy);bar.appendChild(close);
 card.appendChild(h);card.appendChild(ta);card.appendChild(bar);ov.appendChild(card);
 document.body.appendChild(ov);ta.select();
-}catch(e){alert('Scout pull failed: '+(e&&e.message?e.message:e));}})();`;
+}catch(e){alert(${JSON.stringify(s.failed)}+(e&&e.message?e.message:e));}})();`;
+}
 
 const VERDICT_META = {
   'real weakness': { key: 'vWeak', cls: 'dis', icon: '🔴' },
@@ -1023,7 +1035,10 @@ function renderScout() {
 function wireScoutInputs() {
   const bm = $('#scout-bm');
   if (bm) {
-    bm.href = SCOUT_BOOKMARKLET;
+    bm.href = scoutBookmarklet({
+      noProfile: t('bmNoProfile'), progress: t('bmProgress'), noMatches: t('bmNoMatches'),
+      done: t('bmDone'), copy: t('bmCopy'), copied: t('bmCopied'), close: t('bmClose'), failed: t('bmFailed'),
+    });
     // clicking it here would run in our origin (CORS-blocked) — it's meant to be
     // dragged to the bookmarks bar and clicked on the Buckler site instead.
     bm.addEventListener('click', e => { e.preventDefault(); scoutMsg(t('scoutBmDrag')); render(); });
