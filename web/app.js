@@ -12,8 +12,9 @@ const state = {
   usageW: {},             // per-opponent usage-weight override (sparse; absent = auto from play rate)
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
   useUsage: true,         // weight opponents by play rate (down-weights rare chars)
-  personalRows: [],       // your parsed battlelog rows (Scout view; in-memory only)
-  personalMode: false,    // read views through your own battlelog (shrunk vs baseline)
+  roster: {},             // {cfnId: profile} — persisted player histories
+  activeProfileId: null,  // which profile the scout/views read
+  personalMode: false,    // read views through the active profile (shrunk vs baseline)
 };
 
 // transient status line for the Scout view (set before render(), shown once)
@@ -24,6 +25,10 @@ let months = [];
 let usageCsv = '';
 
 const $ = sel => document.querySelector(sel);
+// escape a free-form string (profile names) for safe innerHTML interpolation — character
+// names stay roster-validated via validRows (scout.js); names can't be, so escape them.
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DEFAULT_TIER = { 36: 0, 40: 1, 41: 2, 42: 3 };
 const MONTH_STEP = 0.25;  // per-click increment for month-weight steppers (0..1)
 const BAR_HALF = 0.6;     // matchup bar full deflection at |score - 5| = 0.6 (bars view)
@@ -55,7 +60,7 @@ const sfmt = (v, nd = 3) => v === null || v === undefined ? '—'
 // mode off. dir from your shrunk win-rate − the global baseline (score units).
 function personalAnno(opp) {
   if (!personalActive()) return null;
-  const rec = aggregate(state.personalRows, state.char)[opp];
+  const rec = aggregate(activeRows(), state.char, personalMonthW())[opp];
   if (!rec) return null;
   const [w, l] = rec;
   const base = combinedRow(idx, state.char, state.monthW, exclude(), state.tierW)[opp];
@@ -93,6 +98,9 @@ async function init() {
   buildTierSliders();
   buildOppWeights();
   wireControls();
+  try { state.roster = await loadRoster(); } catch (e) { state.roster = {}; }
+  const ids = rosterList();
+  if (ids.length) { state.activeProfileId = ids[0].cfnId; $('#personal-toggle').disabled = false; }
   render();
 }
 
@@ -122,24 +130,45 @@ function usageMap() {
   return { ...usageWeights(usageRates(usageCsv, state.monthW, state.tierW)), ...state.usageW };
 }
 
+/* ---------- roster accessors ---------- */
+
+function activeProfile() { return state.activeProfileId ? state.roster[state.activeProfileId] : null; }
+function activeRows() { const p = activeProfile(); return p ? p.rows : []; }
+function rosterList() {
+  return Object.values(state.roster).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+// month-weight map for the PERSONAL aggregate (whole-game month filter). 'all' => null
+// (count every match). 'current' also counts post-patch months the global matrix hasn't
+// caught up to yet, so recent personal games aren't silently dropped. 'custom' respects
+// exactly the months the user enabled.
+function personalMonthW() {
+  if (state.preset === 'all') return null;
+  const mw = { ...state.monthW };
+  if (state.preset === 'current') {
+    for (const r of activeRows()) { const m = monthOf(r.date); if (!(m in mw) && m >= PATCH_MONTH) mw[m] = 1; }
+  }
+  return mw;
+}
+
 /* ---------- personal lens selectors (Personal mode; see scout.js) ---------- */
 
 // is the personal lens active? (toggle on AND a battlelog is loaded)
-function personalActive() { return state.personalMode && state.personalRows.length > 0; }
+function personalActive() { return state.personalMode && activeRows().length > 0; }
 
 // the matchup row a view should use: personal shrunk row when Personal mode is on,
 // else the global COMB row. Same {opp: score} shape either way.
 function activeRow(char) {
   if (personalActive()) {
     return personalRow(idx, char, state.monthW, exclude(), state.tierW,
-                       aggregate(state.personalRows, char));
+                       aggregate(activeRows(), char, personalMonthW()));
   }
   return combinedRow(idx, char, state.monthW, exclude(), state.tierW);
 }
 
 // {opp: count} of how often you faced each opponent as `char` (empty when off)
 function activeEncounter(char) {
-  return personalActive() ? personalEncounter(state.personalRows, char) : {};
+  return personalActive() ? personalEncounter(activeRows(), char) : {};
 }
 
 // opponent usage-weight map: personal encounter weights when Personal mode is on,
@@ -720,8 +749,8 @@ function renderThreats() {
   const pts = [];
   if (personalActive()) {
     // personal: x = your encounter share, y = your shrunk win-rate, size = your sample
-    const row = personalRow(idx, state.char, state.monthW, ex, state.tierW, aggregate(state.personalRows, state.char));
-    const enc = personalEncounter(state.personalRows, state.char);
+    const row = personalRow(idx, state.char, state.monthW, ex, state.tierW, aggregate(activeRows(), state.char, personalMonthW()));
+    const enc = personalEncounter(activeRows(), state.char);
     const totalGames = Object.values(enc).reduce((s, n) => s + n, 0);
     const maxN = Math.max(1, ...Object.values(enc));
     for (const opp of Object.keys(row)) {
@@ -843,35 +872,41 @@ function ingestCsvFile(file) {
     let rows;
     try { rows = csvToRows(String(reader.result)); }
     catch (e) { scoutMsg(t('scoutBadCsv'), true); render(); return; }
-    loadParsedRows(rows);
+    loadParsedRows({ owner: 'csv-import', name: t('rosterCsvName'), isSelf: false, rows });
   };
   reader.onerror = () => { scoutMsg(t('scoutBadCsv'), true); render(); };
   reader.readAsText(file);
 }
 
-function loadParsedRows(parsed) {
+function loadParsedRows(payload) {
   // drop rows with unknown characters / bad results before they reach the HTML UI
-  parsed = validRows(parsed, ROSTER_NAMES());
-  if (!parsed.length) { scoutMsg(t('scoutNoMatches'), true); render(); return; }
-  const before = state.personalRows.length;
-  state.personalRows = mergeRows(state.personalRows, parsed);
-  const added = state.personalRows.length - before;
+  const rows = validRows(payload && payload.rows, ROSTER_NAMES());
+  if (!payload || !rows.length) { scoutMsg(t('scoutNoMatches'), true); render(); return; }
+  const clean = { ...payload, rows };
+  const now = Date.now();
+  const { roster, activeId } = routePull(state.roster, clean, now);
+  const added = roster[activeId].rows.length - (state.roster[activeId]?.rows.length || 0);
+  state.roster = roster;
+  state.activeProfileId = activeId;
+  saveProfile(roster[activeId]);                 // persist (async, fire-and-forget)
   const tgl = $('#personal-toggle'); if (tgl) tgl.disabled = false;   // enable Personal mode
-  scoutMsg(t('scoutLoaded', { added, total: state.personalRows.length }));
-  const main = mostPlayed(state.personalRows);
+  scoutMsg(t('scoutLoaded', { added, total: roster[activeId].rows.length }));
+  const main = mostPlayed(roster[activeId].rows);
   if (main && idx[main]) selectChar(main);   // selectChar re-renders
   else render();
 }
 
 function clearScoutData() {
-  state.personalRows = [];
-  state.personalMode = false;
-  const tgl = $('#personal-toggle'); if (tgl) { tgl.checked = false; tgl.disabled = true; }
+  const id = state.activeProfileId;
+  if (id) { delete state.roster[id]; deleteProfileFromStore(id); }
+  const next = rosterList()[0];
+  state.activeProfileId = next ? next.cfnId : null;
+  if (!next) { state.personalMode = false; const t2 = $('#personal-toggle'); if (t2) { t2.checked = false; t2.disabled = true; } }
   scoutMsg(null); render();
 }
 
 function downloadScoutCsv() {
-  const blob = new Blob([rowsToCsv(state.personalRows)], { type: 'text/csv' });
+  const blob = new Blob([rowsToCsv(activeRows())], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'sf6_personal_battlelog.csv';
@@ -971,14 +1006,14 @@ function renderScout() {
   $('#reliab-legend').hidden = true;
   $('#hero-summary').innerHTML = '';
 
-  if (!state.personalRows.length) {
+  if (!activeRows().length) {
     $('#caption').innerHTML = t('scoutIntro');
     $('#lanes').innerHTML = scoutStatusHtml() + scoutInputsHtml(false);
     wireScoutInputs();
     return;
   }
 
-  const rows = state.personalRows;
+  const rows = activeRows();
   const myChars = [...new Set(rows.map(r => r.your_char))]
     .sort((a, b) => rows.filter(r => r.your_char === b).length - rows.filter(r => r.your_char === a).length);
   const char = state.char;
@@ -991,7 +1026,13 @@ function renderScout() {
     const n = rows.filter(r => r.your_char === c).length;
     return `<button class="sc-mychar ${c === char ? 'active' : ''}" data-mychar="${c}">${cn(c)} <i>${n}</i></button>`;
   }).join('');
+  const profiles = rosterList();
+  const picker = profiles.length > 1
+    ? `<select class="sc-profile" id="sc-profile">${profiles.map(p =>
+        `<option value="${escapeHtml(p.cfnId)}" ${p.cfnId === state.activeProfileId ? 'selected' : ''}>${p.isSelf ? '★ ' : ''}${escapeHtml(p.name)} (${p.rows.length})</option>`).join('')}</select>`
+    : `<span class="sc-profile-name">${profiles[0]?.isSelf ? '★ ' : ''}${escapeHtml(profiles[0]?.name || '')}</span>`;
   const summary = `<div class="sc-bar">
+    ${picker}
     <span class="sc-count"><b>${rows.length}</b> ${t('scoutMatches')}</span>
     <span class="sc-playing">${t('scoutPlaying')}</span>
     <span class="sc-mychars">${charChips}</span>
@@ -1032,6 +1073,7 @@ function renderScout() {
   });
   $('#scout-dl')?.addEventListener('click', downloadScoutCsv);
   $('#scout-clear')?.addEventListener('click', clearScoutData);
+  $('#sc-profile')?.addEventListener('change', e => { state.activeProfileId = e.target.value; const m = mostPlayed(activeRows()); if (m && idx[m]) selectChar(m); else render(); });
 }
 
 function wireScoutInputs() {
@@ -1103,7 +1145,7 @@ function renderSubs() {
     worst3: worst3.map(o => `<b>${cn(o)}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
     metric: `${t('hCover')}${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
-  if (personalActive() && !Object.keys(aggregate(state.personalRows, state.char)).length) {
+  if (personalActive() && !Object.keys(aggregate(activeRows(), state.char, personalMonthW())).length) {
     $('#caption').innerHTML += ` <b>${t('personalNoGames', { char: cn(state.char) })}</b>`;
   }
 
