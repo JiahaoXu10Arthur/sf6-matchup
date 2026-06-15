@@ -67,8 +67,6 @@ function personalAnno(opp) {
 }
 const annoArrow = a => a.dir === 'up' ? '↑' : a.dir === 'dn' ? '↓' : '·';
 
-init();
-
 async function init() {
   setLang(lang);
   applyI18n();
@@ -1128,3 +1126,7 @@ function wireChips() {
       if (idx[c]) openCharCard(c, el);   // open the character detail card
     }));
 }
+
+// bootstrap last, so every top-level const/let is initialized before init()→render()
+// runs (the standalone build calls init() synchronously — no fetch await to yield on).
+init();

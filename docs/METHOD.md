@@ -321,7 +321,34 @@ one tier (e.g. rated 4.6 at UltM but 5.1 at HighM) may not appear in the
 worst-3 after tier combination, so the worst-3 list reflects the aggregate
 rather than any single tier's perspective.
 
-## 10. Limitations
+## 10. Personal mode — shrinkage blend
+
+The web app's **Personal mode** reads every view through your own battlelog while
+still honouring the global data. For your active character it replaces the global
+COMB row `m̄(O)` with a **shrunk** row: each opponent's win-rate is your wins/losses
+combined with the global baseline as a Beta-Binomial conjugate prior.
+
+With baseline win-rate `p0` (the global COMB score ÷ 10) as the prior mean and a
+prior strength `κ = 20` pseudo-games, your `w` wins and `l` losses give a posterior
+`Beta(p0·κ + w, (1−p0)·κ + l)`; the shrunk win-rate is its mean,
+`(p0·κ + w) / (κ + w + l)`, rescaled ×10 back onto the 5.0-centred scale. Two
+consequences make the blend safe as a global toggle:
+
+- **Zero games ⇒ exactly the baseline.** With `w = l = 0` the posterior mean is
+  `p0`, so unplayed matchups render identically to the global view and "off" and
+  "on" coincide wherever you have no data.
+- **Evidence earns trust gradually.** A 0–2 record is pulled most of the way back to
+  the baseline; a 30–20 record sits close to your observed 60 %. This is the same
+  estimator the Scout report uses (`scripts/bayes.py` / `web/scout.js`), so the
+  classification thresholds (real weakness / overperforming / small sample / on par)
+  and the personalised views agree by construction.
+
+Personalised encounter frequency (the Matchup map x-axis and the Sub Recommend usage
+weighting in Personal mode) comes from your raw battlelog counts, not the global
+usage table. Candidate sub rows stay global — you rarely have personal data for a
+pocket you don't play.
+
+## 11. Limitations
 
 - **No sample sizes.** Buckler publishes no per-matchup match counts. No
   sample-size or inverse-variance weighting is possible; the 0:1:2:3 tier
