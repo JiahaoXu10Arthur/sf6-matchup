@@ -306,6 +306,7 @@ function parseBattlelog(nextData, myShortId, names) {
       your_char: officialName(me.character_name, officialMap),
       opp_char: officialName(opp.character_name, officialMap),
       rank_mr: String(me.master_rating ?? ''),
+      opp_mr: String(opp.master_rating ?? ''),
       result: myRounds > oppRounds ? 'W' : 'L',
     });
   }

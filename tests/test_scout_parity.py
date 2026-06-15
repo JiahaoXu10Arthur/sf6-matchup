@@ -71,7 +71,10 @@ def test_parse_battlelog_matches():
     next_data = json.loads(FIXTURE.read_text())
     py = parse_battlelog(next_data, OWNER)
     g = js('parse', {'fixturePath': str(FIXTURE), 'owner': OWNER, 'names': NAMES})
-    assert g == py
+    # opp_mr is a JS-app-only passthrough field (the Coach uses it); the Python reference
+    # parser doesn't model it, so parity holds on the shared canonical fields.
+    g_shared = [{k: v for k, v in r.items() if k != 'opp_mr'} for r in g]
+    assert g_shared == py
 
 
 def test_scout_join_matches():
