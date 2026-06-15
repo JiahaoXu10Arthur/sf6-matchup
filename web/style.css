@@ -656,7 +656,7 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
 
 .sc-table { display: flex; flex-direction: column; gap: 2px; }
 .sc-row {
-  display: grid; grid-template-columns: minmax(8rem,1.4fr) 3.4rem 3.4rem minmax(8.5rem,1.3fr) 3.8rem minmax(7rem,1fr);
+  display: grid; grid-template-columns: minmax(8rem,1.4fr) 3.4rem 3.4rem minmax(8.5rem,1.3fr) 3.8rem minmax(7rem,1fr) minmax(6rem,1fr);
   align-items: center; gap: 0.6rem; width: 100%; text-align: left;
   background: var(--surface); border: 1px solid var(--line-soft); border-radius: 7px; padding: 0.5rem 0.7rem;
   font-family: var(--font-mono); font-size: 0.78rem; font-variant-numeric: tabular-nums; color: var(--text);
@@ -679,11 +679,15 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .sc-verdict.adv { color: var(--t-adv); }
 .sc-verdict.even { color: var(--text-dim); }
 .sc-verdict.dim { color: var(--text-dim); opacity: 0.75; }
+.sc-pocket { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
+.sc-pocket-go { font-family: var(--font-display); font-size: 0.72rem; font-weight: 600; color: var(--accent); background: rgba(110,139,255,0.1); border: 1px solid rgba(110,139,255,0.35); border-radius: 5px; padding: 0.15rem 0.4rem; cursor: pointer; white-space: nowrap; }
+.sc-pocket-go i { font-style: normal; color: var(--t-adv); }
+.sc-pocket-go:hover { background: rgba(110,139,255,0.2); }
 
 @media (max-width: 720px) {
   .scout-inputs, .scout-inputs.compact { grid-template-columns: 1fr; }
   .sc-row { grid-template-columns: minmax(6rem,1.3fr) 3rem minmax(6rem,1fr) minmax(6rem,1fr); }
-  .sc-raw, .sc-base, .sc-head .sc-raw, .sc-head .sc-base { display: none; }
+  .sc-raw, .sc-base, .sc-head .sc-raw, .sc-head .sc-base, .sc-pocket { display: none; }
   .sc-actions { margin-left: 0; }
 }
 

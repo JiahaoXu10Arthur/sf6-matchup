@@ -905,6 +905,30 @@ function scoutVerdictCell(verdict) {
   return `<span class="sc-verdict ${m.cls}">${m.icon} ${t(m.key)}</span>`;
 }
 
+// best pocket vs one opponent = the character with the highest GLOBAL matchup score
+// against `opp` (an actual edge, > 5.0), excluding your main + the excluded set.
+function bestPocket(opp) {
+  const ex = exclude();
+  let best = null, bestScore = 5.0;
+  for (const sub of Object.keys(idx)) {
+    if (sub === state.char || ex.has(sub)) continue;
+    const sc = combinedRow(idx, sub, state.monthW, ex, state.tierW)[opp];
+    if (sc != null && sc > bestScore) { bestScore = sc; best = sub; }
+  }
+  return best ? { sub: best, score: bestScore } : null;
+}
+
+// pocket cell: only where you underperform (shrunk < baseline). The jump control
+// is a role=button span — the row itself is a <button>, so a nested <button> would
+// be invalid markup.
+function scoutPocketCell(r) {
+  if (r.shrunk >= r.baseline) return `<span class="sc-pocket">—</span>`;
+  const p = bestPocket(r.opp);
+  return p
+    ? `<span class="sc-pocket"><span class="sc-pocket-go" role="button" tabindex="0" data-pocket="${p.sub}">${cn(p.sub)} <i>${p.score.toFixed(2)}</i> →</span></span>`
+    : `<span class="sc-pocket">${t('scoutNoPocket')}</span>`;
+}
+
 function scoutTableHtml(results) {
   const pct = p => (p * 100).toFixed(1) + '%';
   const head = `<div class="sc-row sc-head">
@@ -914,6 +938,7 @@ function scoutTableHtml(results) {
     <span class="sc-shrunk">${t('scoutShrunk')}</span>
     <span class="sc-base">${t('scoutBaseline')}</span>
     <span class="sc-verd">${t('scoutVerdict')}</span>
+    <span class="sc-pocket">${t('scoutPocket')}</span>
   </div>`;
   const rows = results.map(r => {
     const raw = r.n ? r.wins / r.n : 0;
@@ -924,6 +949,7 @@ function scoutTableHtml(results) {
       <span class="sc-shrunk">${pct(r.shrunk)} <small>[${pct(r.lo)}–${pct(r.hi)}]</small></span>
       <span class="sc-base">${pct(r.baseline)}</span>
       <span class="sc-verd">${scoutVerdictCell(r.verdict)}</span>
+      ${scoutPocketCell(r)}
     </button>`;
   }).join('');
   return `<div class="sc-table">${head}${rows}</div>`;
@@ -982,6 +1008,11 @@ function renderScout() {
 
   wireScoutInputs();
   wireChips();
+  document.querySelectorAll('#lanes .sc-pocket-go').forEach(el => {
+    const go = e => { e.stopPropagation(); if (idx[el.dataset.pocket]) openCharCard(el.dataset.pocket, el); };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
+  });
   document.querySelectorAll('#lanes .sc-mychar').forEach(b =>
     b.addEventListener('click', () => selectChar(b.dataset.mychar)));
   $('#scout-add')?.addEventListener('click', () => {
