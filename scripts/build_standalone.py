@@ -18,6 +18,7 @@ OUT = ROOT / 'standalone'
 
 I18N = (WEB / 'i18n.js').read_text()
 SCORING = (WEB / 'scoring.js').read_text()
+SCOUT = (WEB / 'scout.js').read_text()
 CSV = (ROOT / 'output' / 'matrix.csv').read_text()
 USAGE = (ROOT / 'output' / 'usage.csv').read_text()
 
@@ -51,6 +52,7 @@ def build(index_path, css_path, app_path, out_name):
         f'<script>var CHAR_IMG = {json.dumps(CHAR_IMG)};</script>\n'
         f'<script>\n{I18N}\n</script>\n'
         f'<script>\n{SCORING}\n</script>\n'
+        f'<script>\n{SCOUT}\n</script>\n'
         f'<script>\n{app}\n</script>\n'
     )
     html = html.replace('</body>', bundle + '</body>')
