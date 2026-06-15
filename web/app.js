@@ -941,7 +941,7 @@ function scoutTableHtml(results) {
   const rows = results.map(r => {
     const raw = r.n ? r.wins / r.n : 0;
     return `<button class="sc-row" data-char="${r.opp}" title="${t('chipHint')}">
-      <span class="sc-opp"><img class="sc-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.display='none'">${cn(r.opp)}</span>
+      <span class="sc-opp"><img class="sc-avatar" src="${imgSrc(r.opp)}" alt="" onerror="this.style.display='none'">${cn(r.opp)}</span>
       <span class="sc-wl">${r.wins}–${r.losses}</span>
       <span class="sc-raw">${pct(raw)}</span>
       <span class="sc-shrunk">${pct(r.shrunk)} <small>[${pct(r.lo)}–${pct(r.hi)}]</small></span>
