@@ -722,3 +722,17 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 /* trend (over-time) line chart — reuses .scatter tick/grid/axis-ref/pt styles */
 .scatter.trend .trend-line { stroke: var(--accent); stroke-width: 2.5; }
 .scatter.trend .pt circle { fill: var(--accent); }
+
+/* coach priority list */
+.coach-list { display: flex; flex-direction: column; gap: 6px; }
+.coach-card { display: grid; grid-template-columns: 2rem minmax(7rem,1.4fr) minmax(8rem,1fr) 4.5rem minmax(8rem,1.2fr) minmax(6rem,1fr); gap: 0.6rem; align-items: center; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; padding: 0.55rem 0.8rem; font-family: var(--font-mono); font-size: 0.8rem; }
+.coach-card.top { border-color: var(--accent); background: var(--raised); }
+.cc-rank { font-family: var(--font-display); font-weight: 800; color: var(--text-dim); }
+.cc-opp { display: flex; align-items: center; gap: 0.45rem; font-family: var(--font-display); font-weight: 600; }
+.cc-rate small { color: var(--text-dim); font-size: 0.7rem; }
+.cc-n { color: var(--text-dim); }
+.cc-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.cc-tag { font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid var(--line); color: var(--text-dim); }
+.cc-tag.personal { color: var(--t-dis); border-color: var(--t-dis); }
+.cc-tag.hard { color: var(--text-dim); }
+.cc-tag.small { opacity: 0.7; }

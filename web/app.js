@@ -509,7 +509,7 @@ function render() {
   if (state.view === 'match') renderMatch();
   else if (state.view === 'bars') renderBars();
   else if (state.view === 'scatter') renderScatter();
-  else if (state.view === 'threats') renderThreats();
+  else if (state.view === 'threats') renderCoach();
   else if (state.view === 'scout') renderScout();
   else if (state.view === 'trend') renderTrend();
   else renderSubs();
@@ -744,47 +744,41 @@ function renderScatter() {
 // per-character "threat map": one point per opponent — x = how often you face
 // them (usage), y = your win-rate vs them. Lower-right (common & you lose) is
 // the drill list; dot size = data confidence (reliability).
-function renderThreats() {
-  $('#reliab-legend').hidden = true;
-  const ex = exclude();
-  const pts = [];
-  if (personalActive()) {
-    // personal: x = your encounter share, y = your shrunk win-rate, size = your sample
-    const row = personalRow(idx, state.char, state.monthW, ex, state.tierW, aggregate(activeRows(), state.char, personalMonthW()));
-    const enc = personalEncounter(activeRows(), state.char);
-    const totalGames = Object.values(enc).reduce((s, n) => s + n, 0);
-    const maxN = Math.max(1, ...Object.values(enc));
-    for (const opp of Object.keys(row)) {
-      const win = row[opp] * 10, n = enc[opp] || 0;
-      pts.push({
-        char: opp, x: totalGames ? n / totalGames * 100 : 0, y: win, size: n / maxN, cls: winCls(win),
-        title: `${cn(opp)} · ${n} ${t('scoutMatches')} · ${win.toFixed(2)}% ${t('ccWin')}`,
-      });
-    }
-    $('#hero-summary').innerHTML = '';
-    $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) })
-      + (totalGames === 0 ? ` <b>${t('personalNoGames', { char: cn(state.char) })}</b>` : '');
-  } else {
-    const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
-    const table = charTable(idx, state.char, state.monthW, ex, state.tierW, PATCH_MONTH);
-    const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
-    for (const r of table) {
-      const v = metric(r);
-      if (v == null || rates[r.opp] == null) continue;
-      const win = v * 10, rel = reliability(r.nmo, r.nranks, r.spread).score;
-      pts.push({
-        char: r.opp, x: rates[r.opp], y: win, size: rel, cls: winCls(win),
-        title: `${cn(r.opp)} · ${rates[r.opp].toFixed(1)}% ${t('threatFaced')} · ${win.toFixed(2)}% ${t('ccWin')}`,
-      });
-    }
-    $('#hero-summary').innerHTML = '';
-    $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) });
-  }
-  if (pts.length < 2) { $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`; return; }
-  buildScatter(pts, {
-    axisX: 'threatAxisUsage', axisY: 'threatAxisWin', aria: 'labelThreats',
-    quadTR: 'quadComfort', quadTL: 'quadFree', quadBR: 'quadPriority', quadBL: 'quadMinor',
+// Coach view: the active profile's matchups ranked by what's worth practicing next —
+// frequency × how far below the skill-matched baseline you are × confidence.
+function renderCoach() {
+  $('#reliab-legend').hidden = true; $('#hero-summary').innerHTML = '';
+  const rows = activeRows();
+  if (!rows.length) { $('#caption').innerHTML = t('coachNone'); $('#lanes').innerHTML = `<div class="lane-empty">${t('coachNone')}</div>`; return; }
+  const char = state.char;
+  const agg = skillMatchedAgg(rows, char);
+  const baseline = baselineWinrates(idx, char, state.monthW, exclude(), state.tierW);
+  const freq = personalEncounter(rows, char);
+  const ranked = prioritize(diagnoseFromBaseline(baseline, agg), freq).filter(d => d.score > 0);
+  $('#caption').innerHTML = t('coachCaption', { char: cn(char) });
+  if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('coachNoGaps', { char: cn(char) })}</div>`; return; }
+  $('#lanes').innerHTML = `<div class="coach-list">${ranked.slice(0, 5).map((d, i) => coachCard(d, i, freq)).join('')}</div>`;
+  document.querySelectorAll('#lanes .sc-pocket-go').forEach(el => {
+    const go = e => { e.stopPropagation(); if (idx[el.dataset.pocket]) openCharCard(el.dataset.pocket, el); };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
   });
+}
+
+// one ranked card: rank, opponent, shrunk-vs-baseline, games, tags, pocket escape hatch.
+function coachCard(d, i, freq) {
+  const personal = d.personalGap > 0.02 ? `<span class="cc-tag personal">${t('coachTagPersonal')}</span>` : '';
+  const hard = d.universalHardness > 0.02 ? `<span class="cc-tag hard">${t('coachTagHard')}</span>` : '';
+  const small = d.n < MIN_TRUST ? `<span class="cc-tag small">${t('coachTagSmall')}</span>` : '';
+  const w = Math.round(d.shrunk * 100), b = Math.round(d.baseline * 100);
+  return `<div class="coach-card${i === 0 ? ' top' : ''}">
+    <span class="cc-rank">${i + 1}</span>
+    <span class="cc-opp"><img class="sc-avatar" src="${imgSrc(d.opp)}" alt="" onerror="this.style.display='none'">${cn(d.opp)}</span>
+    <span class="cc-rate">${w}% <small>vs ${b}% base</small></span>
+    <span class="cc-n">${freq[d.opp] || 0} ${t('coachGames')}</span>
+    <span class="cc-tags">${personal || `<span class="cc-tag">${t('coachTagOk')}</span>`}${hard}${small}</span>
+    ${scoutPocketCell(d)}
+  </div>`;
 }
 
 /* ---------- Personal Matchup Scout (in-browser; data stays local) ---------- */
