@@ -20,6 +20,10 @@ if (mode === 'reg') {
   out = s.parseBattlelog(nd, arg.owner, arg.names);
 } else if (mode === 'scout') {
   out = s.scout(arg.agg, arg.baseline);
+} else if (mode === 'valid') {
+  out = s.validRows(arg.rows, arg.names);
+} else if (mode === 'csv') {
+  try { out = { rows: s.csvToRows(arg.text) }; } catch (e) { out = { error: e.message }; }
 } else {
   throw new Error('unknown mode ' + mode);
 }

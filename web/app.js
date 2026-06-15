@@ -60,8 +60,8 @@ function personalAnno(opp) {
   const [w, l] = rec;
   const base = combinedRow(idx, state.char, state.monthW, exclude(), state.tierW)[opp];
   if (base == null) return null;
-  const shrunk = personalRow(idx, state.char, state.monthW, exclude(), state.tierW,
-                             aggregate(state.personalRows, state.char))[opp];
+  // shrink just this matchup (classify) rather than building the whole personal row
+  const shrunk = classify(base / 10, w, l).shrunk * 10;
   const delta = shrunk - base;
   return { wl: `${w}–${l}`, dir: delta >= 0.1 ? 'up' : delta <= -0.1 ? 'dn' : 'even' };
 }
@@ -850,7 +850,9 @@ function ingestCsvFile(file) {
 }
 
 function loadParsedRows(parsed) {
-  if (!parsed || !parsed.length) { scoutMsg(t('scoutNoMatches'), true); render(); return; }
+  // drop rows with unknown characters / bad results before they reach the HTML UI
+  parsed = validRows(parsed, ROSTER_NAMES());
+  if (!parsed.length) { scoutMsg(t('scoutNoMatches'), true); render(); return; }
   const before = state.personalRows.length;
   state.personalRows = mergeRows(state.personalRows, parsed);
   const added = state.personalRows.length - before;

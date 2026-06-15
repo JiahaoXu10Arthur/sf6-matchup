@@ -284,6 +284,9 @@ function csvToRows(text) {
   const lines = text.replace(/\r\n/g, '\n').trim().split('\n');
   if (!lines.length) return [];
   const header = splitCsvLine(lines[0]);
+  for (const f of CSV_FIELDS) {
+    if (!header.includes(f)) throw new Error('CSV missing required column: ' + f);
+  }
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i]) continue;
@@ -321,6 +324,18 @@ function mergeRows(existing, incoming) {
   return [...byId.values()];
 }
 
+// Keep only well-formed rows: a non-empty string replay_id, both characters in the
+// official roster (`names`), and result W/L. This defends the HTML-interpolating Scout
+// UI against crafted/malformed payloads (a character name with quotes/angle brackets
+// would otherwise reach innerHTML) and drops junk before it can collapse in mergeRows.
+function validRows(rows, names) {
+  const set = new Set(names);
+  return (rows || []).filter(r =>
+    r && typeof r.replay_id === 'string' && r.replay_id &&
+    set.has(r.your_char) && set.has(r.opp_char) &&
+    (r.result === 'W' || r.result === 'L'));
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     lgamma, regIncompleteBeta, betaPosterior, posteriorMean, betaPpf,
@@ -329,6 +344,6 @@ if (typeof module !== 'undefined') {
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
     buildOfficialMap, officialName, parseBattlelog, parsePayload,
-    CSV_FIELDS, rowsToCsv, csvToRows, mergeRows,
+    CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
 }

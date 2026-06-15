@@ -88,3 +88,22 @@ def test_scout_join_matches():
         assert gr['wins'] == pr['wins'] and gr['losses'] == pr['losses']
         assert gr['shrunk'] == pytest.approx(pr['shrunk'], abs=TOL)
         assert gr['deficit'] == pytest.approx(pr['deficit'], abs=TOL)
+
+
+def test_valid_rows_filters_unknown_chars_bad_results_and_missing_id():
+    names = ['TERRY', 'KEN']
+    rows = [
+        {'replay_id': 'a', 'your_char': 'TERRY', 'opp_char': 'KEN', 'result': 'W', 'date': '1', 'rank_mr': ''},   # keep
+        {'replay_id': 'b', 'your_char': 'TERRY', 'opp_char': '<img src=x onerror=alert(1)>', 'result': 'W', 'date': '1', 'rank_mr': ''},  # injection name
+        {'replay_id': 'c', 'your_char': 'TERRY', 'opp_char': 'KEN', 'result': 'X', 'date': '1', 'rank_mr': ''},   # bad result
+        {'replay_id': '', 'your_char': 'TERRY', 'opp_char': 'KEN', 'result': 'L', 'date': '1', 'rank_mr': ''},    # no id
+    ]
+    out = js('valid', {'rows': rows, 'names': names})
+    assert [r['replay_id'] for r in out] == ['a']   # only the well-formed, in-roster row survives
+
+
+def test_csv_to_rows_rejects_a_malformed_header():
+    good = 'replay_id,date,your_char,opp_char,rank_mr,result\nx,1,TERRY,KEN,,W\n'
+    bad = 'foo,bar\n1,2\n'   # missing required columns
+    assert js('csv', {'text': good})['rows'][0]['replay_id'] == 'x'
+    assert 'error' in js('csv', {'text': bad})
