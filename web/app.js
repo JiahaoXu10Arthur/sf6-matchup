@@ -51,6 +51,22 @@ const fmt = (v, nd = 3) => v === null || v === undefined ? '—' : v.toFixed(nd)
 const sfmt = (v, nd = 3) => v === null || v === undefined ? '—'
   : (v >= 0 ? '+' : '') + v.toFixed(nd);
 
+// personal annotation for one opponent: {wl, dir} or null when no games / Personal
+// mode off. dir from your shrunk win-rate − the global baseline (score units).
+function personalAnno(opp) {
+  if (!personalActive()) return null;
+  const rec = aggregate(state.personalRows, state.char)[opp];
+  if (!rec) return null;
+  const [w, l] = rec;
+  const base = combinedRow(idx, state.char, state.monthW, exclude(), state.tierW)[opp];
+  if (base == null) return null;
+  const shrunk = personalRow(idx, state.char, state.monthW, exclude(), state.tierW,
+                             aggregate(state.personalRows, state.char))[opp];
+  const delta = shrunk - base;
+  return { wl: `${w}–${l}`, dir: delta >= 0.1 ? 'up' : delta <= -0.1 ? 'dn' : 'even' };
+}
+const annoArrow = a => a.dir === 'up' ? '↑' : a.dir === 'dn' ? '↓' : '·';
+
 init();
 
 async function init() {
@@ -493,10 +509,14 @@ function matchChip(r, metric) {
     : r.dpatch >= 0.1 ? '<span class="chip-trend up">↑</span>' : '';
   const pip = `<span class="chip-reliab r-${r.reliab}" title="${t(RELIAB_LABEL[r.reliab])}" aria-label="${t(RELIAB_LABEL[r.reliab])}">${RELIAB_PIPS[r.reliab]}</span>`;
   const title = `High ${fmt(r.t40)} · Grand ${fmt(r.t41)} · Ult ${fmt(r.t42)} · Δ ${sfmt(r.dpatch)} · ${r.nmo}${t('moSuffix')} · ${t('chipHint')}`;
+  const anno = personalAnno(r.opp);
+  const annoHtml = anno
+    ? `<span class="chip-personal ${anno.dir}" title="${t('personalDelta')}">${anno.wl} ${annoArrow(anno)}</span>`
+    : '';
   return `<button class="chip ${tierCls}" data-char="${r.opp}" title="${title}">
     <img class="chip-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.display='none'">
     <span class="chip-name">${cn(r.opp)}</span>
-    <span class="chip-score">${fmt(v, 2)}</span>${trend}${pip}
+    <span class="chip-score">${fmt(v, 2)}</span>${annoHtml}${trend}${pip}
   </button>`;
 }
 
@@ -538,12 +558,21 @@ function barRowHtml(r, metric) {
   const frac = Math.max(-1, Math.min(1, (v - 5.0) / BAR_HALF));
   const barCls = frac >= 0 ? 'adv' : 'dis';
   const flag = r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '';
+  // personal column only exists in Personal mode (keeps global layout identical)
+  const anno = personalAnno(r.opp);
+  const annoHtml = personalActive()
+    ? (anno
+        ? `<span class="col-personal ${anno.dir}" title="${t('personalDelta')}">${anno.wl} ${annoArrow(anno)}</span>`
+        : '<span class="col-personal"></span>')
+    : '';
   return `<div class="row" data-char="${r.opp}">
+
     <span class="name"><img class="row-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="row-name-text">${cn(r.opp)}${flag}</span></span>
     <div class="bar-track"><div class="bar ${barCls}" style="transform:scaleX(${Math.abs(frac)})"></div></div>
     <div class="nums">
       <span class="col-main ${v >= 5 ? 'adv' : 'dis'}">${fmt(v, 2)}</span>
       <span class="col-sub" title="${t('hDpatchHint')}">Δ ${sfmt(r.dpatch)}</span>
+      ${annoHtml}
     </div>
   </div>`;
 }
@@ -571,12 +600,13 @@ function renderBars() {
   ];
   const kpiHtml = kpis.map(c =>
     `<div class="kpi ${c.tone || ''}"><span class="kpi-label">${c.label}</span><span class="kpi-val">${c.val}${c.sub ? `<small>${c.sub}</small>` : ''}</span></div>`).join('');
+  const personalHead = personalActive() ? `<span class="col-personal">${t('personalOn')}</span>` : '';
   const axisHtml = `<span>${t('axisOpponent')}</span>` +
     `<span class="axis-bar"><span>${t('axisLosing')}</span><span>${t('axisEven')}</span><span>${t('axisWinning')}</span></span>` +
-    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub" title="${t('hDpatchHint')}">${t('hDpatch')}</span></div>`;
+    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub" title="${t('hDpatchHint')}">${t('hDpatch')}</span>${personalHead}</div>`;
 
   $('#lanes').innerHTML =
-    `<div class="bars"><div class="kpis">${kpiHtml}</div><div class="axis">${axisHtml}</div>` +
+    `<div class="bars${personalActive() ? ' personal' : ''}"><div class="kpis">${kpiHtml}</div><div class="axis">${axisHtml}</div>` +
     `<div class="rows">${rows.map(r => barRowHtml(r, metric)).join('')}</div></div>`;
 
   document.querySelectorAll('#lanes .row[data-char]').forEach(el =>
