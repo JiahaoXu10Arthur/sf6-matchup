@@ -270,6 +270,13 @@ win-rate; Sub Recommend ranks pockets against the matchups you actually lose; Ti
 and Bars annotate your W–L and over/under-perform delta; and the Scout table names
 your best pocket per losing matchup. Personal data stays in the browser.
 
+The Scout keeps a **roster** of players — yourself and others — keyed by CFN id with
+editable names. Each profile **accumulates** its match history across pulls (merge-deduped
+by replay id, persisted in the browser via IndexedDB), so depth grows over time even though
+a single Buckler pull only reaches the last ~100 ranked games. Month- and patch-weighted
+views, a per-matchup pre/post-patch Δ, and a **Trend** chart all read the active profile,
+and you can **export/import** the whole roster as a JSON file you own. Nothing is uploaded.
+
 ## Offline standalone build
 
 Pre-built files are attached to the

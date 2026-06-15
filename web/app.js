@@ -804,6 +804,9 @@ var ndEl=document.getElementById('__NEXT_DATA__');
 var nd=ndEl?JSON.parse(ndEl.textContent):null;
 var owner=(parts[1]?parts[1].split('/')[0]:'')||(nd&&nd.props.pageProps.fighter_banner_info&&nd.props.pageProps.fighter_banner_info.personal_info.short_id);
 if(!owner){alert(${JSON.stringify(s.noProfile)});return;}
+var meta=nd&&nd.props.pageProps?nd.props.pageProps:{};
+var pname=(meta.fighter_banner_info&&meta.fighter_banner_info.personal_info&&meta.fighter_banner_info.personal_info.fighter_id)||String(owner);
+var lu=meta.common&&meta.common.loginUser?meta.common.loginUser.shortId:null;
 var base='https://www.streetfighter.com/6/buckler/profile/'+owner+'/battlelog/rank?page=';
 var pill=document.createElement('div');
 pill.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:8px;padding:10px 14px;font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45)';
@@ -825,7 +828,7 @@ await new Promise(z=>setTimeout(z,500));
 }
 pill.remove();
 if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
-var blob=JSON.stringify({owner:owner,replays:replays});
+var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays});
 var ov=document.createElement('div');
 ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
 var card=document.createElement('div');
