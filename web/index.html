@@ -34,6 +34,7 @@
       <button role="tab" aria-selected="false" data-view="subs" data-i18n="viewSubs">Sub finder</button>
       <button role="tab" aria-selected="false" data-view="scatter" data-i18n="viewScatter">Usage × Win</button>
       <button role="tab" aria-selected="false" data-view="threats" data-i18n="viewThreats">Threats</button>
+      <button role="tab" aria-selected="false" data-view="scout" data-i18n="viewScout">Scout</button>
     </nav>
     <label class="char-field">
       <span class="control-label" data-i18n="character">Character</span>
@@ -81,6 +82,8 @@
         <span class="control-label" data-i18n="exclude">Exclude characters</span>
         <label class="usage-toggle"><input type="checkbox" id="usage-toggle" checked>
           <span data-i18n="usageWeight">Weight by usage</span></label>
+        <label class="usage-toggle personal-toggle"><input type="checkbox" id="personal-toggle" disabled>
+          <span data-i18n="personalMode">Personal mode</span></label>
         <div class="exclude-chips" id="exclude-chips"></div>
         <small class="exclude-hint" data-i18n="excludeHint">drop low-sample opponents</small>
       </div>
@@ -94,6 +97,7 @@
 
   <script src="i18n.js"></script>
   <script src="scoring.js"></script>
+  <script src="scout.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

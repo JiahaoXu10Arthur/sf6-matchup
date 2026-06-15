@@ -21,7 +21,7 @@ SF6 Matchup Lab 聚合大师及以上四个段位的逐月对局胜率数据，�
 
 ## 在线演示
 
-同一应用、五个视图标签共享同一套数据与逻辑，访问
+同一应用、六个视图标签共享同一套数据与逻辑，访问
 <https://jiahaoxu10arthur.github.io/sf6-matchup/web/>：
 
 | 视图 | 说明 |
@@ -66,7 +66,7 @@ sf6-matchup/
 │   ├── bayes.py                 # 个人侦察：纯 Beta-Binomial 统计
 │   ├── personal_scout.py        # 个人侦察：将你的战绩与基线对比分类（命令行）
 │   └── fetch_battlelog.py       # 个人侦察：Playwright 战斗记录抓取 + 纯解析器
-├── web/                     # 应用 —— 五个视图标签（index.html、style.css、app.js、scoring.js、i18n.js、img/）
+├── web/                     # 应用 —— 六个视图标签（index.html、style.css、app.js、scoring.js、scout.js、i18n.js、img/）
 ├── standalone/              # 生成的离线单文件
 ├── tests/                   # pytest 测试，含 Python↔JS 一致性校验
 ├── docs/                    # METHOD.md / METHOD.zh-CN.md（方法论）、plan.md
@@ -172,8 +172,17 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 ## 个人对位侦察（本地，可选）
 
 用 Beta-Binomial 收缩把*你自己*的 Buckler 排位战绩与全局基线对比，使小样本的波动
-不被误判为真实弱点。它完全在你本机运行，需要你的 Capcom 登录；你的会话与对局数据
-保留在本地（`data/personal/`，已 gitignore），绝不提交。
+不被误判为真实弱点。每个对手会相对共享的对位基线（与网页应用同一套 `combined_row`）
+被归类为*真实弱点*、*超常发挥*、*小样本* 或 *持平*，并给出每个对位 90% 的可信区间。
+无论用哪种方式，你的对局数据都保持私密，绝不上传。
+
+**在浏览器中（任何人，免安装）。** 打开网页应用或离线版中的 **个人侦察** 标签页。
+把其中的 *导入我的 Buckler 记录* 按钮拖到书签栏，然后在已登录的 Capcom Buckler 网站上
+点击它：它会翻页抓取你的排位战斗记录并复制为 JSON，供你粘贴回标签页；你也可以上传个人
+CSV。解析与评分全程在页面内运行（`web/scout.js`）—— 你的对战数据绝不离开浏览器。
+
+**在本机（命令行）。** 适合需要脚本化/离线流程并使用 Capcom 登录的场景；会话与对局数据
+保留在本地（`data/personal/`，已 gitignore）：
 
 ```bash
 pip install playwright && playwright install chromium
@@ -181,21 +190,30 @@ python3 scripts/fetch_battlelog.py --cfn <你的 short_id>   # 一次性登录�
 python3 scripts/personal_scout.py  --cfn <你的 short_id>   # -> output/<id>_scout.md
 ```
 
-分析内核（`scripts/bayes.py`、`scripts/personal_scout.py`）是纯标准库且经一致性测试；
-仅抓取步骤需要 Playwright。每个对手会相对共享的对位基线（与网页应用同一套 `combined_row`）
-被归类为*真实弱点*、*超常发挥*、*小样本* 或 *持平*，并给出每个对位 90% 的可信区间。
+分析内核是共享且经一致性测试的：`scripts/bayes.py` + `scripts/personal_scout.py`
+（纯标准库）与其 JS 移植 `web/scout.js` 通过 `tests/test_scout_parity.py` 验证一致
+（误差 `1e-9` 以内）。仅命令行抓取步骤需要 Playwright。
 
 ## 交互式网页应用
 
 ```bash
 python3 -m http.server 8741        # 在仓库根目录运行
-# 应用：http://localhost:8741/web/   （相性表 · 柱状图 · 副角推荐 · 使用率 × 胜率 · 对位地图）
+# 应用：http://localhost:8741/web/   （相性表 · 柱状图 · 副角推荐 · 使用率 × 胜率 · 对位地图 · 个人侦察）
 ```
 
 应用在浏览器中基于 `output/matrix.csv` 即时重新计算：角色选择、
 分段位标签或段位加权综合（COMB）、可直接输入的月份与段位权重、逐对手使用率权重、
-INGRID 开关、重置，以及五个视图标签。`web/scoring.js` 中的计算逻辑是
-`scripts/scoring.py` 的移植；`tests/test_js_parity.py` 验证两套实现的结果一致（误差 `1e-9` 以内）。
+INGRID 开关、重置，以及六个视图标签 —— 包括浏览器内的 **个人侦察**（见上文）。
+`web/scoring.js` 与 `web/scout.js` 中的计算逻辑分别是 `scripts/scoring.py` 与
+`scripts/bayes.py`/`personal_scout.py` 的移植；`tests/test_js_parity.py` 与
+`tests/test_scout_parity.py` 验证各套实现的结果一致（误差 `1e-9` 以内）。
+
+在「个人侦察」标签页导入战斗记录后，**个人模式** 开关会让对位地图、副角推荐与
+相性表/柱状图按你自己的天梯数据呈现。每个对位都是你的战绩向全球基准收缩的结果
+（Beta-Binomial，约 20 局先验），因此在你没有对局数据的地方会精确回退到全球数据 ——
+关闭开关时各视图与全球默认完全一致。对位地图以「你的遭遇频率 × 你的收缩胜率」绘制；
+副角推荐按你实际失利的对位排序；相性表与柱状图标注你的胜负与超常/不及预期的差值；
+个人侦察表则为每个劣势对位给出推荐副角。个人数据全程留在浏览器中。
 
 ## 离线单文件构建
 
@@ -208,7 +226,7 @@ python3 scripts/build_standalone.py
 
 在 `standalone/` 中生成一份自包含文件，已内联数据集、代码与样式，并移除全部外部依赖：
 
-- `sf6-matchup.html` —— 完整应用（全部五个视图标签）
+- `sf6-matchup.html` —— 完整应用（全部六个视图标签）
 
 双击即可运行 —— 无需联网、服务器或安装 —— 可通过邮件、即时通讯或 U 盘分享。
 自定义显示字体被省略（其依赖 Google Fonts），布局将回退到系统字体。

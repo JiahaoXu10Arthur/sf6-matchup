@@ -12,7 +12,12 @@ const state = {
   usageW: {},             // per-opponent usage-weight override (sparse; absent = auto from play rate)
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
   useUsage: true,         // weight opponents by play rate (down-weights rare chars)
+  personalRows: [],       // your parsed battlelog rows (Scout view; in-memory only)
+  personalMode: false,    // read views through your own battlelog (shrunk vs baseline)
 };
+
+// transient status line for the Scout view (set before render(), shown once)
+let scoutStatus = null;
 
 let idx = null;
 let months = [];
@@ -46,7 +51,21 @@ const fmt = (v, nd = 3) => v === null || v === undefined ? '—' : v.toFixed(nd)
 const sfmt = (v, nd = 3) => v === null || v === undefined ? '—'
   : (v >= 0 ? '+' : '') + v.toFixed(nd);
 
-init();
+// personal annotation for one opponent: {wl, dir} or null when no games / Personal
+// mode off. dir from your shrunk win-rate − the global baseline (score units).
+function personalAnno(opp) {
+  if (!personalActive()) return null;
+  const rec = aggregate(state.personalRows, state.char)[opp];
+  if (!rec) return null;
+  const [w, l] = rec;
+  const base = combinedRow(idx, state.char, state.monthW, exclude(), state.tierW)[opp];
+  if (base == null) return null;
+  // shrink just this matchup (classify) rather than building the whole personal row
+  const shrunk = classify(base / 10, w, l).shrunk * 10;
+  const delta = shrunk - base;
+  return { wl: `${w}–${l}`, dir: delta >= 0.1 ? 'up' : delta <= -0.1 ? 'dn' : 'even' };
+}
+const annoArrow = a => a.dir === 'up' ? '↑' : a.dir === 'dn' ? '↓' : '·';
 
 async function init() {
   setLang(lang);
@@ -84,7 +103,9 @@ function applyI18n() {
   document.querySelectorAll('.lang-switch button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
   $('#view-label').textContent = t(state.view === 'bars' ? 'labelBars'
     : state.view === 'subs' ? 'labelSubs'
-    : state.view === 'scatter' ? 'labelScatter' : 'labelMatch');
+    : state.view === 'scatter' ? 'labelScatter'
+    : state.view === 'threats' ? 'labelThreats'
+    : state.view === 'scout' ? 'labelScout' : 'labelMatch');
   $('#char-name').textContent = cn(state.char);
   setAvatar($('#char-avatar'), state.char);
   document.querySelectorAll('#char-select option').forEach(o => o.textContent = cn(o.value));
@@ -99,6 +120,35 @@ function exclude() { return new Set(Object.keys(state.oppW).filter(c => state.op
 function usageMap() {
   if (!state.useUsage || !usageCsv) return null;
   return { ...usageWeights(usageRates(usageCsv, state.monthW, state.tierW)), ...state.usageW };
+}
+
+/* ---------- personal lens selectors (Personal mode; see scout.js) ---------- */
+
+// is the personal lens active? (toggle on AND a battlelog is loaded)
+function personalActive() { return state.personalMode && state.personalRows.length > 0; }
+
+// the matchup row a view should use: personal shrunk row when Personal mode is on,
+// else the global COMB row. Same {opp: score} shape either way.
+function activeRow(char) {
+  if (personalActive()) {
+    return personalRow(idx, char, state.monthW, exclude(), state.tierW,
+                       aggregate(state.personalRows, char));
+  }
+  return combinedRow(idx, char, state.monthW, exclude(), state.tierW);
+}
+
+// {opp: count} of how often you faced each opponent as `char` (empty when off)
+function activeEncounter(char) {
+  return personalActive() ? personalEncounter(state.personalRows, char) : {};
+}
+
+// opponent usage-weight map: personal encounter weights when Personal mode is on,
+// else the existing global usageMap(). Manual overrides (state.usageW) still win.
+function activeUsage(char) {
+  if (personalActive()) {
+    return { ...usageWeights(activeEncounter(char)), ...state.usageW };
+  }
+  return usageMap();
 }
 
 /* ---------- controls (shared shape with v1) ---------- */
@@ -287,6 +337,8 @@ function resetDefaults() {
   state.usageW = {};
   state.useUsage = true;
   $('#usage-toggle').checked = true;
+  state.personalMode = false;
+  const ptgl = $('#personal-toggle'); if (ptgl) ptgl.checked = false;
   setPreset('current');
   state.monthW = monthWeights(months, 'current', PATCH_MONTH);
   document.querySelectorAll('.rank-tabs button').forEach(x => {
@@ -412,13 +464,14 @@ function wireControls() {
     }));
 
   $('#usage-toggle').addEventListener('change', e => { state.useUsage = e.target.checked; render(); });
+  $('#personal-toggle').addEventListener('change', e => { state.personalMode = e.target.checked; render(); });
 
   $('#reset-btn').addEventListener('click', resetDefaults);
 }
 
 /* ---------- tier rendering ---------- */
 
-const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter', threats: 'labelThreats' };
+const VIEW_LABEL = { match: 'labelMatch', bars: 'labelBars', subs: 'labelSubs', scatter: 'labelScatter', threats: 'labelThreats', scout: 'labelScout' };
 
 function render() {
   closeCharCard();
@@ -428,6 +481,7 @@ function render() {
   else if (state.view === 'bars') renderBars();
   else if (state.view === 'scatter') renderScatter();
   else if (state.view === 'threats') renderThreats();
+  else if (state.view === 'scout') renderScout();
   else renderSubs();
 }
 
@@ -453,10 +507,14 @@ function matchChip(r, metric) {
     : r.dpatch >= 0.1 ? '<span class="chip-trend up">↑</span>' : '';
   const pip = `<span class="chip-reliab r-${r.reliab}" title="${t(RELIAB_LABEL[r.reliab])}" aria-label="${t(RELIAB_LABEL[r.reliab])}">${RELIAB_PIPS[r.reliab]}</span>`;
   const title = `High ${fmt(r.t40)} · Grand ${fmt(r.t41)} · Ult ${fmt(r.t42)} · Δ ${sfmt(r.dpatch)} · ${r.nmo}${t('moSuffix')} · ${t('chipHint')}`;
+  const anno = personalAnno(r.opp);
+  const annoHtml = anno
+    ? `<span class="chip-personal ${anno.dir}" title="${t('personalDelta')}">${anno.wl} ${annoArrow(anno)}</span>`
+    : '';
   return `<button class="chip ${tierCls}" data-char="${r.opp}" title="${title}">
     <img class="chip-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.display='none'">
     <span class="chip-name">${cn(r.opp)}</span>
-    <span class="chip-score">${fmt(v, 2)}</span>${trend}${pip}
+    <span class="chip-score">${fmt(v, 2)}</span>${annoHtml}${trend}${pip}
   </button>`;
 }
 
@@ -498,12 +556,21 @@ function barRowHtml(r, metric) {
   const frac = Math.max(-1, Math.min(1, (v - 5.0) / BAR_HALF));
   const barCls = frac >= 0 ? 'adv' : 'dis';
   const flag = r.spread > 0.25 ? `<span class="flag" title="${t('spreadFlag')}">⚠</span>` : '';
+  // personal column only exists in Personal mode (keeps global layout identical)
+  const anno = personalAnno(r.opp);
+  const annoHtml = personalActive()
+    ? (anno
+        ? `<span class="col-personal ${anno.dir}" title="${t('personalDelta')}">${anno.wl} ${annoArrow(anno)}</span>`
+        : '<span class="col-personal"></span>')
+    : '';
   return `<div class="row" data-char="${r.opp}">
+
     <span class="name"><img class="row-avatar" src="${imgSrc(r.opp)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="row-name-text">${cn(r.opp)}${flag}</span></span>
     <div class="bar-track"><div class="bar ${barCls}" style="transform:scaleX(${Math.abs(frac)})"></div></div>
     <div class="nums">
       <span class="col-main ${v >= 5 ? 'adv' : 'dis'}">${fmt(v, 2)}</span>
       <span class="col-sub" title="${t('hDpatchHint')}">Δ ${sfmt(r.dpatch)}</span>
+      ${annoHtml}
     </div>
   </div>`;
 }
@@ -531,12 +598,13 @@ function renderBars() {
   ];
   const kpiHtml = kpis.map(c =>
     `<div class="kpi ${c.tone || ''}"><span class="kpi-label">${c.label}</span><span class="kpi-val">${c.val}${c.sub ? `<small>${c.sub}</small>` : ''}</span></div>`).join('');
+  const personalHead = personalActive() ? `<span class="col-personal">${t('personalOn')}</span>` : '';
   const axisHtml = `<span>${t('axisOpponent')}</span>` +
     `<span class="axis-bar"><span>${t('axisLosing')}</span><span>${t('axisEven')}</span><span>${t('axisWinning')}</span></span>` +
-    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub" title="${t('hDpatchHint')}">${t('hDpatch')}</span></div>`;
+    `<div class="nums"><span class="col-main">${t('hScore')}</span><span class="col-sub" title="${t('hDpatchHint')}">${t('hDpatch')}</span>${personalHead}</div>`;
 
   $('#lanes').innerHTML =
-    `<div class="bars"><div class="kpis">${kpiHtml}</div><div class="axis">${axisHtml}</div>` +
+    `<div class="bars${personalActive() ? ' personal' : ''}"><div class="kpis">${kpiHtml}</div><div class="axis">${axisHtml}</div>` +
     `<div class="rows">${rows.map(r => barRowHtml(r, metric)).join('')}</div></div>`;
 
   document.querySelectorAll('#lanes .row[data-char]').forEach(el =>
@@ -649,25 +717,337 @@ function renderScatter() {
 function renderThreats() {
   $('#reliab-legend').hidden = true;
   const ex = exclude();
-  const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
-  const table = charTable(idx, state.char, state.monthW, ex, state.tierW, PATCH_MONTH);
-  const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
   const pts = [];
-  for (const r of table) {
-    const v = metric(r);
-    if (v == null || rates[r.opp] == null) continue;
-    const win = v * 10, rel = reliability(r.nmo, r.nranks, r.spread).score;
-    pts.push({
-      char: r.opp, x: rates[r.opp], y: win, size: rel, cls: winCls(win),
-      title: `${cn(r.opp)} · ${rates[r.opp].toFixed(1)}% ${t('threatFaced')} · ${win.toFixed(2)}% ${t('ccWin')}`,
-    });
+  if (personalActive()) {
+    // personal: x = your encounter share, y = your shrunk win-rate, size = your sample
+    const row = personalRow(idx, state.char, state.monthW, ex, state.tierW, aggregate(state.personalRows, state.char));
+    const enc = personalEncounter(state.personalRows, state.char);
+    const totalGames = Object.values(enc).reduce((s, n) => s + n, 0);
+    const maxN = Math.max(1, ...Object.values(enc));
+    for (const opp of Object.keys(row)) {
+      const win = row[opp] * 10, n = enc[opp] || 0;
+      pts.push({
+        char: opp, x: totalGames ? n / totalGames * 100 : 0, y: win, size: n / maxN, cls: winCls(win),
+        title: `${cn(opp)} · ${n} ${t('scoutMatches')} · ${win.toFixed(2)}% ${t('ccWin')}`,
+      });
+    }
+    $('#hero-summary').innerHTML = '';
+    $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) })
+      + (totalGames === 0 ? ` <b>${t('personalNoGames', { char: cn(state.char) })}</b>` : '');
+  } else {
+    const rates = usageCsv ? usageRates(usageCsv, state.monthW, state.tierW) : {};
+    const table = charTable(idx, state.char, state.monthW, ex, state.tierW, PATCH_MONTH);
+    const metric = r => state.rank === 'comb' ? r.comb : r['t' + state.rank];
+    for (const r of table) {
+      const v = metric(r);
+      if (v == null || rates[r.opp] == null) continue;
+      const win = v * 10, rel = reliability(r.nmo, r.nranks, r.spread).score;
+      pts.push({
+        char: r.opp, x: rates[r.opp], y: win, size: rel, cls: winCls(win),
+        title: `${cn(r.opp)} · ${rates[r.opp].toFixed(1)}% ${t('threatFaced')} · ${win.toFixed(2)}% ${t('ccWin')}`,
+      });
+    }
+    $('#hero-summary').innerHTML = '';
+    $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) });
   }
-  $('#hero-summary').innerHTML = '';
-  $('#caption').innerHTML = t('threatCaption', { char: cn(state.char) });
   if (pts.length < 2) { $('#lanes').innerHTML = `<div class="lane-empty">${t('scatterEmpty')}</div>`; return; }
   buildScatter(pts, {
     axisX: 'threatAxisUsage', axisY: 'threatAxisWin', aria: 'labelThreats',
     quadTR: 'quadComfort', quadTL: 'quadFree', quadBR: 'quadPriority', quadBL: 'quadMinor',
+  });
+}
+
+/* ---------- Personal Matchup Scout (in-browser; data stays local) ---------- */
+
+// Self-contained bookmarklet: run it while logged into Buckler. It reads your
+// profile id from the URL, pages your ranked battlelog, and pops a copy box with
+// a compact {owner, replays} JSON to paste into the Scout tab. No regex/quotes
+// nesting so it survives as a template literal; all parsing happens here in-app.
+// Build the "Pull my Buckler log" bookmarklet with localized strings baked in
+// (it runs on Buckler's origin, outside our app, so it can't reach our i18n at
+// runtime — we interpolate the current language's strings at drag time). It shows
+// a live progress pill (page p/n) and ends with a copy box.
+function scoutBookmarklet(s) {
+  return `javascript:(async()=>{try{
+var parts=location.pathname.split('/profile/');
+var ndEl=document.getElementById('__NEXT_DATA__');
+var nd=ndEl?JSON.parse(ndEl.textContent):null;
+var owner=(parts[1]?parts[1].split('/')[0]:'')||(nd&&nd.props.pageProps.fighter_banner_info&&nd.props.pageProps.fighter_banner_info.personal_info.short_id);
+if(!owner){alert(${JSON.stringify(s.noProfile)});return;}
+var base='https://www.streetfighter.com/6/buckler/profile/'+owner+'/battlelog/rank?page=';
+var pill=document.createElement('div');
+pill.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:8px;padding:10px 14px;font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45)';
+document.body.appendChild(pill);
+var seen={},replays=[],total=20,shown='?';
+for(var p=1;p<=20;p++){
+pill.textContent=${JSON.stringify(s.progress)}.replace('{p}',p).replace('{n}',shown);
+var html=await fetch(base+p,{credentials:'include'}).then(x=>x.text());
+var doc=new DOMParser().parseFromString(html,'text/html');
+var el=doc.getElementById('__NEXT_DATA__');
+if(!el)break;
+var pp=JSON.parse(el.textContent).props.pageProps;
+if(p===1&&pp.total_page){total=Math.min(20,pp.total_page);shown=total;pill.textContent=${JSON.stringify(s.progress)}.replace('{p}',p).replace('{n}',shown);}
+var list=(pp.replay_list)||[];
+var fresh=0,i,r;
+for(i=0;i<list.length;i++){r=list[i];if(!seen[r.replay_id]){seen[r.replay_id]=1;replays.push(r);fresh++;}}
+if(!fresh||p>=total)break;
+await new Promise(z=>setTimeout(z,500));
+}
+pill.remove();
+if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
+var blob=JSON.stringify({owner:owner,replays:replays});
+var ov=document.createElement('div');
+ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
+var card=document.createElement('div');
+card.style.cssText='background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:10px;padding:18px;width:min(560px,92vw);font-family:system-ui,sans-serif';
+var h=document.createElement('p');h.textContent=${JSON.stringify(s.done)}.replace('{n}',replays.length);h.style.cssText='margin:0 0 10px;font-size:14px';
+var ta=document.createElement('textarea');ta.value=blob;ta.readOnly=true;ta.style.cssText='width:100%;height:120px;font-family:monospace;font-size:11px;background:#0b0e16;color:#eaeef7;border:1px solid #283047;border-radius:6px;padding:8px;box-sizing:border-box';
+var bar=document.createElement('div');bar.style.cssText='margin-top:12px;display:flex;gap:8px;justify-content:flex-end';
+var copy=document.createElement('button');copy.textContent=${JSON.stringify(s.copy)};copy.style.cssText='padding:7px 16px;border-radius:6px;border:none;background:#6e8bff;color:#0b0e16;font-weight:700;cursor:pointer';
+copy.onclick=function(){ta.select();try{navigator.clipboard.writeText(blob)}catch(e){document.execCommand('copy')}copy.textContent=${JSON.stringify(s.copied)};};
+var close=document.createElement('button');close.textContent=${JSON.stringify(s.close)};close.style.cssText='padding:7px 16px;border-radius:6px;border:1px solid #283047;background:transparent;color:#eaeef7;cursor:pointer';
+close.onclick=function(){ov.remove()};
+bar.appendChild(copy);bar.appendChild(close);
+card.appendChild(h);card.appendChild(ta);card.appendChild(bar);ov.appendChild(card);
+document.body.appendChild(ov);ta.select();
+}catch(e){alert(${JSON.stringify(s.failed)}+(e&&e.message?e.message:e));}})();`;
+}
+
+const VERDICT_META = {
+  'real weakness': { key: 'vWeak', cls: 'dis', icon: '🔴' },
+  'overperforming': { key: 'vStrong', cls: 'adv', icon: '🟢' },
+  'small sample': { key: 'vSmall', cls: 'dim', icon: '⚪' },
+  'on par': { key: 'vOnPar', cls: 'even', icon: '➖' },
+};
+
+function scoutMsg(text, isErr = false) { scoutStatus = text ? { text, isErr } : null; }
+
+const ROSTER_NAMES = () => Object.keys(SLUG_BY_NAME);
+
+// parse a pasted bookmarklet/__NEXT_DATA__ blob, merge into state, pick your main
+function ingestPayloadText(text) {
+  text = (text || '').trim();
+  if (!text) return;
+  let payload;
+  try { payload = JSON.parse(text); }
+  catch (e) { scoutMsg(t('scoutBadJson'), true); render(); return; }
+  let parsed;
+  try { parsed = parsePayload(payload, ROSTER_NAMES()); }
+  catch (e) { scoutMsg(t('scoutBadPayload'), true); render(); return; }
+  loadParsedRows(parsed);
+}
+
+function ingestCsvFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let rows;
+    try { rows = csvToRows(String(reader.result)); }
+    catch (e) { scoutMsg(t('scoutBadCsv'), true); render(); return; }
+    loadParsedRows(rows);
+  };
+  reader.onerror = () => { scoutMsg(t('scoutBadCsv'), true); render(); };
+  reader.readAsText(file);
+}
+
+function loadParsedRows(parsed) {
+  // drop rows with unknown characters / bad results before they reach the HTML UI
+  parsed = validRows(parsed, ROSTER_NAMES());
+  if (!parsed.length) { scoutMsg(t('scoutNoMatches'), true); render(); return; }
+  const before = state.personalRows.length;
+  state.personalRows = mergeRows(state.personalRows, parsed);
+  const added = state.personalRows.length - before;
+  const tgl = $('#personal-toggle'); if (tgl) tgl.disabled = false;   // enable Personal mode
+  scoutMsg(t('scoutLoaded', { added, total: state.personalRows.length }));
+  const main = mostPlayed(state.personalRows);
+  if (main && idx[main]) selectChar(main);   // selectChar re-renders
+  else render();
+}
+
+function clearScoutData() {
+  state.personalRows = [];
+  state.personalMode = false;
+  const tgl = $('#personal-toggle'); if (tgl) { tgl.checked = false; tgl.disabled = true; }
+  scoutMsg(null); render();
+}
+
+function downloadScoutCsv() {
+  const blob = new Blob([rowsToCsv(state.personalRows)], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'sf6_personal_battlelog.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function scoutInputsHtml(compact) {
+  // compact = inline "add more" affordance shown above a loaded table
+  return `<div class="scout-inputs ${compact ? 'compact' : ''}">
+    <div class="scout-method">
+      <span class="scout-step">1</span>
+      <div class="scout-method-body">
+        <span class="scout-method-title">${t('scoutBmTitle')}</span>
+        <p class="scout-method-hint">${t('scoutBmHint')}</p>
+        <a class="scout-bm" id="scout-bm" href="#" draggable="true">⚡ ${t('scoutBmLabel')}</a>
+      </div>
+    </div>
+    <div class="scout-method">
+      <span class="scout-step">2</span>
+      <div class="scout-method-body">
+        <span class="scout-method-title">${t('scoutPasteTitle')}</span>
+        <p class="scout-method-hint">${t('scoutPasteHint')}</p>
+        <textarea class="scout-paste" id="scout-paste" rows="3" placeholder="${t('scoutPastePlaceholder')}"></textarea>
+        <div class="scout-paste-row">
+          <button class="scout-go" id="scout-paste-go">${t('scoutGo')}</button>
+          <label class="scout-upload">${t('scoutUpload')}<input type="file" id="scout-file" accept=".csv" hidden></label>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function scoutStatusHtml() {
+  if (!scoutStatus) return '';
+  const html = `<p class="scout-msg ${scoutStatus.isErr ? 'err' : 'ok'}">${scoutStatus.text}</p>`;
+  scoutStatus = null;   // show once
+  return html;
+}
+
+function scoutVerdictCell(verdict) {
+  const m = VERDICT_META[verdict];
+  return `<span class="sc-verdict ${m.cls}">${m.icon} ${t(m.key)}</span>`;
+}
+
+// best pocket vs one opponent = the character with the highest GLOBAL matchup score
+// against `opp` (an actual edge, > 5.0), excluding your main + the excluded set.
+function bestPocket(opp) {
+  const ex = exclude();
+  let best = null, bestScore = 5.0;
+  for (const sub of Object.keys(idx)) {
+    if (sub === state.char || ex.has(sub)) continue;
+    const sc = combinedRow(idx, sub, state.monthW, ex, state.tierW)[opp];
+    if (sc != null && sc > bestScore) { bestScore = sc; best = sub; }
+  }
+  return best ? { sub: best, score: bestScore } : null;
+}
+
+// pocket cell: only where you underperform (shrunk < baseline). The jump control
+// is a role=button span — the row itself is a <button>, so a nested <button> would
+// be invalid markup.
+function scoutPocketCell(r) {
+  if (r.shrunk >= r.baseline) return `<span class="sc-pocket">—</span>`;
+  const p = bestPocket(r.opp);
+  return p
+    ? `<span class="sc-pocket"><span class="sc-pocket-go" role="button" tabindex="0" data-pocket="${p.sub}">${cn(p.sub)} <i>${p.score.toFixed(2)}</i> →</span></span>`
+    : `<span class="sc-pocket">${t('scoutNoPocket')}</span>`;
+}
+
+function scoutTableHtml(results) {
+  const pct = p => (p * 100).toFixed(1) + '%';
+  const head = `<div class="sc-row sc-head">
+    <span class="sc-opp">${t('scoutOpp')}</span>
+    <span class="sc-wl">${t('scoutWL')}</span>
+    <span class="sc-raw">${t('scoutRaw')}</span>
+    <span class="sc-shrunk">${t('scoutShrunk')}</span>
+    <span class="sc-base">${t('scoutBaseline')}</span>
+    <span class="sc-verd">${t('scoutVerdict')}</span>
+    <span class="sc-pocket">${t('scoutPocket')}</span>
+  </div>`;
+  const rows = results.map(r => {
+    const raw = r.n ? r.wins / r.n : 0;
+    return `<button class="sc-row" data-char="${r.opp}" title="${t('chipHint')}">
+      <span class="sc-opp"><img class="sc-avatar" src="${imgSrc(r.opp)}" alt="" onerror="this.style.display='none'">${cn(r.opp)}</span>
+      <span class="sc-wl">${r.wins}–${r.losses}</span>
+      <span class="sc-raw">${pct(raw)}</span>
+      <span class="sc-shrunk">${pct(r.shrunk)} <small>[${pct(r.lo)}–${pct(r.hi)}]</small></span>
+      <span class="sc-base">${pct(r.baseline)}</span>
+      <span class="sc-verd">${scoutVerdictCell(r.verdict)}</span>
+      ${scoutPocketCell(r)}
+    </button>`;
+  }).join('');
+  return `<div class="sc-table">${head}${rows}</div>`;
+}
+
+function renderScout() {
+  $('#reliab-legend').hidden = true;
+  $('#hero-summary').innerHTML = '';
+
+  if (!state.personalRows.length) {
+    $('#caption').innerHTML = t('scoutIntro');
+    $('#lanes').innerHTML = scoutStatusHtml() + scoutInputsHtml(false);
+    wireScoutInputs();
+    return;
+  }
+
+  const rows = state.personalRows;
+  const myChars = [...new Set(rows.map(r => r.your_char))]
+    .sort((a, b) => rows.filter(r => r.your_char === b).length - rows.filter(r => r.your_char === a).length);
+  const char = state.char;
+  const agg = aggregate(rows, char);
+  const baseline = baselineWinrates(idx, char, state.monthW, exclude(), state.tierW);
+  const results = scout(agg, baseline);
+
+  // data summary bar: match count, your-character quick switches, manage buttons
+  const charChips = myChars.map(c => {
+    const n = rows.filter(r => r.your_char === c).length;
+    return `<button class="sc-mychar ${c === char ? 'active' : ''}" data-mychar="${c}">${cn(c)} <i>${n}</i></button>`;
+  }).join('');
+  const summary = `<div class="sc-bar">
+    <span class="sc-count"><b>${rows.length}</b> ${t('scoutMatches')}</span>
+    <span class="sc-playing">${t('scoutPlaying')}</span>
+    <span class="sc-mychars">${charChips}</span>
+    <span class="sc-actions">
+      <button class="sc-action" id="scout-add">${t('scoutAddMore')}</button>
+      <button class="sc-action" id="scout-dl">${t('scoutDownload')}</button>
+      <button class="sc-action danger" id="scout-clear">${t('scoutClear')}</button>
+    </span>
+  </div>`;
+
+  $('#caption').innerHTML = t('scoutCaptionLoaded', { char: cn(char), n: rows.length });
+
+  let body;
+  if (!results.length) {
+    body = `<p class="lane-empty">${t('scoutNoGames', { char: cn(char) })}</p>`;
+  } else {
+    const weaknesses = results.filter(r => r.verdict === 'real weakness').map(r => cn(r.opp));
+    const headline = weaknesses.length
+      ? `<span class="sc-headline dis">${t('scoutTopWeak')}: ${weaknesses.slice(0, 3).join(' · ')}</span>`
+      : `<span class="sc-headline adv">${t('scoutNoWeak')}</span>`;
+    body = `<div class="sc-headline-wrap">${headline}</div>` + scoutTableHtml(results);
+  }
+
+  $('#lanes').innerHTML = summary + scoutStatusHtml() +
+    `<div class="sc-addpanel" id="scout-addpanel" hidden>${scoutInputsHtml(true)}</div>` + body;
+
+  wireScoutInputs();
+  wireChips();
+  document.querySelectorAll('#lanes .sc-pocket-go').forEach(el => {
+    const go = e => { e.stopPropagation(); if (idx[el.dataset.pocket]) openCharCard(el.dataset.pocket, el); };
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(e); } });
+  });
+  document.querySelectorAll('#lanes .sc-mychar').forEach(b =>
+    b.addEventListener('click', () => selectChar(b.dataset.mychar)));
+  $('#scout-add')?.addEventListener('click', () => {
+    const p = $('#scout-addpanel'); if (p) p.hidden = !p.hidden;
+  });
+  $('#scout-dl')?.addEventListener('click', downloadScoutCsv);
+  $('#scout-clear')?.addEventListener('click', clearScoutData);
+}
+
+function wireScoutInputs() {
+  const bm = $('#scout-bm');
+  if (bm) {
+    bm.href = scoutBookmarklet({
+      noProfile: t('bmNoProfile'), progress: t('bmProgress'), noMatches: t('bmNoMatches'),
+      done: t('bmDone'), copy: t('bmCopy'), copied: t('bmCopied'), close: t('bmClose'), failed: t('bmFailed'),
+    });
+    // clicking it here would run in our origin (CORS-blocked) — it's meant to be
+    // dragged to the bookmarks bar and clicked on the Buckler site instead.
+    bm.addEventListener('click', e => { e.preventDefault(); scoutMsg(t('scoutBmDrag')); render(); });
+  }
+  $('#scout-paste-go')?.addEventListener('click', () => ingestPayloadText($('#scout-paste')?.value));
+  $('#scout-file')?.addEventListener('change', e => {
+    const f = e.target.files?.[0]; if (f) ingestCsvFile(f);
   });
 }
 
@@ -697,7 +1077,8 @@ function subRow(r, i, cover, maxAbs) {
 
 function renderSubs() {
   $('#reliab-legend').hidden = true;
-  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(), state.tierW, state.oppW, usageMap());
+  const { worst3, mainRow, results } = subTable(idx, state.char, state.monthW, exclude(),
+    state.tierW, state.oppW, activeUsage(state.char), personalActive() ? activeRow(state.char) : undefined);
   const cover = r => state.rank === 'comb' ? r.cover : r['c' + state.rank];
   const sortVal = r => state.subSort === 'spec' ? r.spec
     : state.subSort === 'str' ? r.strength : cover(r);
@@ -722,6 +1103,9 @@ function renderSubs() {
     worst3: worst3.map(o => `<b>${cn(o)}</b> ${mainRow[o].toFixed(3)}`).join(' · '),
     metric: `${t('hCover')}${state.rank === 'comb' ? '' : '@' + t('rankFull')[state.rank]}`,
   });
+  if (personalActive() && !Object.keys(aggregate(state.personalRows, state.char)).length) {
+    $('#caption').innerHTML += ` <b>${t('personalNoGames', { char: cn(state.char) })}</b>`;
+  }
 
   if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('tierEmpty')}</div>`; return; }
   const maxAbs = Math.max(0.05, ...ranked.map(r => Math.abs(cover(r))));
@@ -759,3 +1143,7 @@ function wireChips() {
       if (idx[c]) openCharCard(c, el);   // open the character detail card
     }));
 }
+
+// bootstrap last, so every top-level const/let is initialized before init()→render()
+// runs (the standalone build calls init() synchronously — no fetch await to yield on).
+init();

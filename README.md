@@ -27,7 +27,7 @@ zero-dependency browser application.
 
 ## Live demo
 
-One app, five view tabs over the same data and logic, at
+One app, six view tabs over the same data and logic, at
 <https://jiahaoxu10arthur.github.io/sf6-matchup/web/>:
 
 | View | Description |
@@ -95,7 +95,7 @@ sf6-matchup/
 │   ├── bayes.py                 # personal scout: pure Beta-Binomial statistics
 │   ├── personal_scout.py        # personal scout: classify your record vs the baseline (CLI)
 │   └── fetch_battlelog.py       # personal scout: Playwright battlelog fetch + pure parser
-├── web/                     # the app — five view tabs (index.html, style.css, app.js, scoring.js, i18n.js, img/)
+├── web/                     # the app — six view tabs (index.html, style.css, app.js, scoring.js, scout.js, i18n.js, img/)
 ├── standalone/              # generated offline single-file build
 ├── tests/                   # pytest suite incl. Python↔JS parity
 ├── docs/                    # METHOD.md / METHOD.zh-CN.md (methodology), plan.md
@@ -220,8 +220,20 @@ python3 recommend.py --char TERRY --months 202502-202605 --profile current
 
 Compare *your own* Buckler ranked record against the global baseline with
 Beta-Binomial shrinkage, so small-sample swings aren't mistaken for genuine
-weaknesses. It runs entirely on your machine and needs your Capcom login; your
-session and match data stay local (`data/personal/`, gitignored) and never commit.
+weaknesses. Each opponent is classed as *real weakness*, *overperforming*,
+*small sample*, or *on par* against the shared matchup baseline (the same
+`combined_row` the web app uses), with a 90% credible interval per matchup. Your
+match data stays private either way — it is never uploaded.
+
+**In the browser (anyone, no install).** Open the **Scout** tab in the web app
+or the offline build. Drag its *Pull my Buckler log* button to your bookmarks
+bar, then click it while logged in at the Capcom Buckler site: it pages your
+ranked battlelog and copies it as JSON for you to paste back into the tab. You
+can also upload a personal CSV. Parsing and scoring run entirely in the page
+(`web/scout.js`) — your battle data never leaves the browser.
+
+**On your machine (CLI).** For a scripted/offline workflow with your Capcom
+login; session and match data stay local (`data/personal/`, gitignored):
 
 ```bash
 pip install playwright && playwright install chromium
@@ -229,24 +241,34 @@ python3 scripts/fetch_battlelog.py --cfn <your_short_id>   # one-time login, the
 python3 scripts/personal_scout.py  --cfn <your_short_id>   # -> output/<id>_scout.md
 ```
 
-The analysis core (`scripts/bayes.py`, `scripts/personal_scout.py`) is pure
-standard library and parity-tested; Playwright is needed only for the fetch step.
-Each opponent is classed as *real weakness*, *overperforming*, *small sample*, or
-*on par* against the shared matchup baseline (the same `combined_row` the web app
-uses), with a 90% credible interval per matchup.
+The analysis core is shared and parity-tested: `scripts/bayes.py` +
+`scripts/personal_scout.py` (pure standard library) and the JS port
+`web/scout.js` agree to `1e-9` via `tests/test_scout_parity.py`. Playwright is
+needed only for the CLI fetch step.
 
 ## Interactive web app
 
 ```bash
 python3 -m http.server 8741        # from the repository root
-# App: http://localhost:8741/web/   (Matchups · Bars · Sub Recommend · Usage × Win · Matchup map)
+# App: http://localhost:8741/web/   (Matchups · Bars · Sub Recommend · Usage × Win · Matchup map · Scout)
 ```
 
 The app recalculates instantly in the browser from `output/matrix.csv`:
 character picker, per-rank tabs or tier-weighted COMB, directly-editable month and
-tier weights, per-opponent usage weights, INGRID toggle, reset, and the five view
-tabs. The scoring math in `web/scoring.js` is a direct port of `scripts/scoring.py`;
-`tests/test_js_parity.py` asserts the two implementations agree to `1e-9`.
+tier weights, per-opponent usage weights, INGRID toggle, reset, and the six view
+tabs — including the in-browser **Scout** (see above). The scoring math in
+`web/scoring.js` and the scout math in `web/scout.js` are direct ports of
+`scripts/scoring.py` and `scripts/bayes.py`/`personal_scout.py`; `tests/test_js_parity.py`
+and `tests/test_scout_parity.py` assert the implementations agree to `1e-9`.
+
+With a battlelog loaded in the Scout tab, the **Personal mode** toggle reads the
+Matchup map, Sub Recommend, and Tiers/Bars through your own ladder. Each matchup is
+your record shrunk toward the global baseline (Beta-Binomial, ~20 pseudo-games), so
+it falls back to global exactly where you have no games — and "off" leaves every view
+identical to the global default. The Matchup map plots your encounters × your shrunk
+win-rate; Sub Recommend ranks pockets against the matchups you actually lose; Tiers
+and Bars annotate your W–L and over/under-perform delta; and the Scout table names
+your best pocket per losing matchup. Personal data stays in the browser.
 
 ## Offline standalone build
 
@@ -261,7 +283,7 @@ python3 scripts/build_standalone.py
 Produces one self-contained file in `standalone/` with the dataset, code, and
 styles inlined and all external dependencies removed:
 
-- `sf6-matchup.html` — the full app (all five view tabs)
+- `sf6-matchup.html` — the full app (all six view tabs)
 
 It runs by double-clicking — no internet, server, or installation required —
 and can be shared by email, messaging, or USB. Custom display fonts are omitted

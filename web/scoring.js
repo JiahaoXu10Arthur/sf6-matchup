@@ -236,9 +236,11 @@ function charTable(idx, char, mw, exclude, tierWeights, patchMonth) {
   return rows;
 }
 
-/* mirrors recommend.py main loop; rows sorted by cover descending */
-function subTable(idx, char, mw, exclude, tierWeights, oppWeights, usage) {
-  const mainRow = combinedRow(idx, char, mw, exclude, tierWeights);
+/* mirrors recommend.py main loop; rows sorted by cover descending.
+   mainRowOverride lets a caller supply a personalized main row (same {opp: score}
+   shape); candidate sub rows stay global. Default reproduces recommend.py exactly. */
+function subTable(idx, char, mw, exclude, tierWeights, oppWeights, usage, mainRowOverride) {
+  const mainRow = mainRowOverride || combinedRow(idx, char, mw, exclude, tierWeights);
   const worst3 = Object.keys(mainRow).sort((a, b) => mainRow[a] - mainRow[b]).slice(0, 3);
   const results = [];
   for (const sub of Object.keys(idx)) {
