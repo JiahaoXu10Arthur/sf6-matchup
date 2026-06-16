@@ -455,19 +455,19 @@ function parseBattlelog(nextData, myShortId, names) {
 // Accept a full __NEXT_DATA__ dict or the compact {owner,name,isSelf,replays} blob and
 // return {owner, name, isSelf, rows, phaseStats}. Older {owner,replays} blobs still parse.
 function parsePayload(payload, names) {
-  const phaseStats = parsePhaseStats(payload.phaseRaw ?? null, names);
+  const phaseSlice = parsePhaseSlice(payload.phaseSlice ?? null, names);
   if (payload?.props?.pageProps?.replay_list) {
     const pp = payload.props.pageProps;
     const owner = pp.fighter_banner_info?.personal_info?.short_id;
     const name = pp.fighter_banner_info?.personal_info?.fighter_id || String(owner);
     const isSelf = pp.common?.loginUser?.shortId != null
       && Number(pp.common.loginUser.shortId) === Number(owner);
-    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names), phaseStats };
+    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names), phaseSlice };
   }
   if (payload?.owner != null && Array.isArray(payload.replays)) {
     const nd = { props: { pageProps: { replay_list: payload.replays } } };
     return { owner: payload.owner, name: payload.name || String(payload.owner),
-             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names), phaseStats };
+             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names), phaseSlice };
   }
   throw new Error('unrecognized battlelog payload');
 }
@@ -479,35 +479,27 @@ function _cntInt(v) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-// Normalize a Buckler /play `play` blob into {seasonId, perChar, perMatchup}. Maps
-// character_alpha -> official roster name, drops the ANY aggregate (id 0), unknown chars,
-// and zero-battle entries; coerces counts to non-negative ints and clamps win <= battle so
-// downstream win-rates stay in [0,1]. Returns null if absent.
-function parsePhaseStats(phaseRaw, names) {
-  if (!phaseRaw || !Array.isArray(phaseRaw.character_win_rates)) return null;
+// Map raw Buckler win-rate arrays -> {perChar, perMatchup} of official-name keys with
+// non-negative-int counts clamped win<=battle; drops ANY (id 0), unknown chars, zero-battle.
+function _mapWinRates(characterWinRates, rivalWinRates, names) {
   const map = buildOfficialMap(names);
   const known = new Set(Object.values(map));
-  const cnt = _cntInt;
   const nm = a => { const o = officialName(a, map); return known.has(o) ? o : null; };
-  const pair = (win, battle) => { const b = cnt(battle); return [Math.min(cnt(win), b), b]; };
+  const pair = (win, battle) => { const b = _cntInt(battle); return [Math.min(_cntInt(win), b), b]; };
   const perChar = {};
-  for (const c of phaseRaw.character_win_rates) {
-    if (!c || typeof c !== 'object') continue;
-    if (c.character_id === 0) continue;
+  const cwr = Array.isArray(characterWinRates) ? characterWinRates : [];
+  for (const c of cwr) {
+    if (!c || typeof c !== 'object' || c.character_id === 0) continue;
     const name = nm(c.character_alpha);
     const [w, b] = pair(c.win_count, c.battle_count);
     if (!name || b === 0) continue;
     perChar[name] = [w, b];
   }
   const byId = {};
-  for (const c of phaseRaw.character_win_rates) {
-    if (!c || typeof c !== 'object') continue;
-    byId[c.character_id] = c.character_alpha;
-  }
+  for (const c of cwr) { if (c && typeof c === 'object') byId[c.character_id] = c.character_alpha; }
   const perMatchup = {};
-  for (const rec of phaseRaw.character_win_rates_by_rival_character || []) {
-    if (!rec || typeof rec !== 'object') continue;
-    if (rec.character_id === 0) continue;
+  for (const rec of (Array.isArray(rivalWinRates) ? rivalWinRates : [])) {
+    if (!rec || typeof rec !== 'object' || rec.character_id === 0) continue;
     const alpha = byId[rec.character_id];
     if (alpha === undefined) continue;
     const name = nm(alpha);
@@ -522,8 +514,17 @@ function parsePhaseStats(phaseRaw, names) {
     }
     if (Object.keys(mm).length) perMatchup[name] = mm;
   }
-  const sid = phaseRaw.current_season_id;
-  return { seasonId: Number.isFinite(sid) ? sid : null, perChar, perMatchup };
+  return { perChar, perMatchup };
+}
+
+// Parse one raw bookmarklet slice {mode, phase, characterWinRates, rivalWinRates} into a
+// validated {mode, phase, perChar, perMatchup}. Returns null if absent.
+function parsePhaseSlice(rawSlice, names) {
+  if (!rawSlice || typeof rawSlice !== 'object') return null;
+  const { perChar, perMatchup } = _mapWinRates(rawSlice.characterWinRates, rawSlice.rivalWinRates, names);
+  const phase = Number.isFinite(Number(rawSlice.phase)) ? Number(rawSlice.phase) : null;
+  const mode = typeof rawSlice.mode === 'string' ? rawSlice.mode : 'ranked';
+  return { mode, phase, perChar, perMatchup };
 }
 
 // Re-validate a stored phaseStats object (untrusted roster import): keep only roster-known
@@ -635,7 +636,7 @@ if (typeof module !== 'undefined') {
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
     mrSlope, matchupGaps, applyMrBridge,
     monthOf, newProfile, routePull, mergeRosters, safeId,
-    buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseStats, sanitizePhaseStats,
+    buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseSlice, _mapWinRates, sanitizePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
 }

@@ -231,3 +231,39 @@ def test_merge_rosters_preserves_phasestats_when_incoming_absent():
     inc  = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 2}}  # no phaseStats
     out = run('mergeRosters', {'base': base, 'incoming': inc})
     assert out['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}    # existing preserved
+
+RAW_SLICE = {
+    'mode': 'ranked', 'phase': 12,
+    'characterWinRates': [
+        {'character_id': 0,  'character_alpha': 'ANY',   'win_count': 9,  'battle_count': 18},
+        {'character_id': 27, 'character_alpha': 'TERRY', 'win_count': 212,'battle_count': 424},
+        {'character_id': 1,  'character_alpha': 'RYU',   'win_count': 0,  'battle_count': 0},
+    ],
+    'rivalWinRates': [
+        {'character_id': 27, 'rival_character_win_rates': [
+            {'rival_character_id': 0,  'rival_character_alpha': 'ANY',     'win_count': 100, 'battle_count': 200},
+            {'rival_character_id': 18, 'rival_character_alpha': 'MARISA',  'win_count': 1,   'battle_count': 7},
+            {'rival_character_id': 99, 'rival_character_alpha': 'ZZGLITCH','win_count': 3,   'battle_count': 3},
+            {'rival_character_id': 7,  'rival_character_alpha': 'JURI',    'win_count': 99,  'battle_count': 5},
+        ]},
+    ],
+}
+NAMES2 = ['TERRY', 'RYU', 'MARISA', 'JURI']
+
+def test_parse_slice_maps_and_keeps_mode_phase():
+    sl = run('parsePhaseSlice', {'rawSlice': RAW_SLICE, 'names': NAMES2})
+    assert sl['mode'] == 'ranked' and sl['phase'] == 12
+    assert sl['perChar'] == {'TERRY': [212, 424]}
+    assert sl['perMatchup']['TERRY']['MARISA'] == [1, 7]
+    assert 'ZZGLITCH' not in sl['perMatchup']['TERRY']
+    assert sl['perMatchup']['TERRY']['JURI'] == [5, 5]
+
+def test_parse_slice_absent_returns_null():
+    assert run('parsePhaseSlice', {'rawSlice': None, 'names': NAMES2}) is None
+
+def test_parse_slice_rejects_infinity():
+    raw = {'mode': 'ranked', 'phase': 5,
+           'characterWinRates': [{'character_id': 27, 'character_alpha': 'TERRY', 'win_count': 'Infinity', 'battle_count': 'Infinity'}],
+           'rivalWinRates': []}
+    sl = run('parsePhaseSlice', {'rawSlice': raw, 'names': NAMES2})
+    assert sl['perChar'] == {}
