@@ -727,6 +727,15 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .coach-list { display: flex; flex-direction: column; gap: 6px; }
 .coach-card { display: grid; grid-template-columns: 2rem minmax(7rem,1.4fr) minmax(8rem,1fr) 4.5rem minmax(8rem,1.2fr) minmax(6rem,1fr); gap: 0.6rem; align-items: center; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; padding: 0.55rem 0.8rem; font-family: var(--font-mono); font-size: 0.8rem; }
 .coach-card.top { border-color: var(--accent); background: var(--raised); }
+
+/* coach phase-stats blend controls */
+.coach-blend { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 8px; display: flex; flex-direction: column; gap: 0.35rem; }
+.coach-charrate { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.coach-phase-badge { font-family: var(--font-display); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.coach-blend-label { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; font-family: var(--font-display); font-size: 0.72rem; font-weight: 600; color: var(--text-dim); cursor: default; }
+.coach-blend-val { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 2.2rem; }
+.coach-blend-off { font-family: var(--font-display); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--t-dis); border: 1px solid var(--t-dis); border-radius: 3px; padding: 0.05rem 0.3rem; opacity: 0.85; }
+.coach-blend-range { flex: 1; min-width: 6rem; }
 .cc-rank { font-family: var(--font-display); font-weight: 800; color: var(--text-dim); }
 .cc-opp { display: flex; align-items: center; gap: 0.45rem; font-family: var(--font-display); font-weight: 600; }
 .cc-rate small { color: var(--text-dim); font-size: 0.7rem; }

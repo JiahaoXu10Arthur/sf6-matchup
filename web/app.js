@@ -12,6 +12,7 @@ const state = {
   usageW: {},             // per-opponent usage-weight override (sparse; absent = auto from play rate)
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
   useUsage: true,         // weight opponents by play rate (down-weights rare chars)
+  coachAlpha: 0.7,        // Buckler phase-stats blend weight: 0 = ignore, 1 = full
   roster: {},             // {cfnId: profile} — persisted player histories
   activeProfileId: null,  // which profile the scout/views read
   personalMode: false,    // read views through the active profile (shrunk vs baseline)
@@ -754,10 +755,31 @@ function renderCoach() {
   const agg = skillMatchedAgg(rows, char);
   const baseline = baselineWinrates(idx, char, state.monthW, exclude(), state.tierW);
   const freq = personalEncounter(rows, char);
-  const ranked = prioritize(diagnoseFromBaseline(baseline, agg), freq).filter(d => d.score > 0);
+  const ps = activeProfile() && activeProfile().phaseStats;
+  const phase = (ps && ps.perMatchup && ps.perMatchup[char]) || null;
+  const opts = phase
+    ? { phase, alpha: state.coachAlpha, mrBeta: mrSlope(rows, char).beta, gaps: matchupGaps(rows, char) }
+    : {};
+  const ranked = prioritize(diagnoseFromBaseline(baseline, agg, opts), freq).filter(d => d.score > 0);
   $('#caption').innerHTML = t('coachCaption', { char: cn(char) });
   if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('coachNoGaps', { char: cn(char) })}</div>`; return; }
-  $('#lanes').innerHTML = `<div class="coach-list">${ranked.slice(0, 5).map((d, i) => coachCard(d, i, freq)).join('')}</div>`;
+  let phaseBlock = '';
+  if (phase) {
+    const charRec = ps.perChar && ps.perChar[char];
+    const charRateLine = charRec
+      ? `<div class="coach-charrate">${t('coachCharRate', { char: escapeHtml(cn(char)), w: Math.round(charRec[0] / charRec[1] * 100), win: charRec[0], n: charRec[1] })}</div>`
+      : '';
+    const seasonLine = ps.seasonId != null
+      ? `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: ps.seasonId })}</div>`
+      : '';
+    const alphaVal = state.coachAlpha.toFixed(2);
+    const offHint = state.coachAlpha === 0 ? ` <span class="coach-blend-off">${t('coachBlendOff')}</span>` : '';
+    phaseBlock = `<div class="coach-blend">${charRateLine}${seasonLine}<label class="coach-blend-label">${t('coachBlend')} <span class="coach-blend-val">${alphaVal}</span>${offHint}<input id="coach-alpha-range" class="coach-blend-range" type="range" min="0" max="1" step="0.05" value="${alphaVal}" aria-label="${t('coachBlend')}"></label></div>`;
+  }
+  $('#lanes').innerHTML = `${phaseBlock}<div class="coach-list">${ranked.slice(0, 5).map((d, i) => coachCard(d, i, freq)).join('')}</div>`;
+  if (phase) {
+    $('#coach-alpha-range').addEventListener('input', e => { state.coachAlpha = Number(e.target.value); renderCoach(); });
+  }
   document.querySelectorAll('#lanes .sc-pocket-go').forEach(el => {
     const go = e => { e.stopPropagation(); if (idx[el.dataset.pocket]) openCharCard(el.dataset.pocket, el); };
     el.addEventListener('click', go);
