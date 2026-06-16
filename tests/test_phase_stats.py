@@ -75,3 +75,27 @@ def test_parse_phase_coerces_bad_counts():
     }
     ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY', 'RYU']})
     assert ps['perChar'] == {'TERRY': [0, 10]}   # -5 -> 0 (clamped non-negative); RYU battle None -> 0 -> dropped
+
+def test_parsepayload_includes_phasestats():
+    payload = {'owner': 5, 'name': 'P', 'replays': [], 'phaseRaw': PHASE_RAW}
+    res = run('parsePayload', {'payload': payload, 'names': NAMES})
+    assert res['phaseStats']['perChar'] == {'TERRY': [264, 516]}
+
+def test_parsepayload_no_phaseraw_is_none():
+    payload = {'owner': 5, 'name': 'P', 'replays': []}
+    res = run('parsePayload', {'payload': payload, 'names': NAMES})
+    assert res['phaseStats'] is None
+
+def test_routepull_phase_replaces_and_battlelog_only_preserves():
+    pl1 = {'owner': '5', 'name': 'P', 'rows': [],
+           'phaseStats': {'seasonId': 12, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}
+    r1 = run('routePull', {'roster': {}, 'payload': pl1, 'now': 1})
+    assert r1['roster']['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}
+    # battlelog-only pull (no phaseStats key) must keep the prior snapshot
+    pl2 = {'owner': '5', 'name': 'P', 'rows': []}
+    r2 = run('routePull', {'roster': r1['roster'], 'payload': pl2, 'now': 2})
+    assert r2['roster']['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}
+
+def test_routepull_new_profile_without_phase_has_no_key():
+    r = run('routePull', {'roster': {}, 'payload': {'owner': '9', 'name': 'Q', 'rows': []}, 'now': 1})
+    assert 'phaseStats' not in r['roster']['9']

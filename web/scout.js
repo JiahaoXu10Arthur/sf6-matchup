@@ -169,21 +169,26 @@ function safeId(id) {
   return (s === '__proto__' || s === 'constructor' || s === 'prototype') ? null : s;
 }
 
-// route a parsed pull ({owner,name,isSelf,rows}) into the roster: create a new profile
-// or merge-dedupe into the existing one by CFN id. Returns {roster, activeId} (immutable;
-// activeId null if the owner is an unsafe key). A pull never clobbers a manual rename — it
-// only fills in the fighter name while the profile still has its default (id) name; isSelf
-// only ever flips on.
+// route a parsed pull ({owner,name,isSelf,rows[,phaseStats]}) into the roster: create a new
+// profile or merge-dedupe into the existing one by CFN id. Returns {roster, activeId}
+// (immutable; activeId null if the owner is an unsafe key). A pull never clobbers a manual
+// rename — it only fills in the fighter name while the profile still has its default (id)
+// name; isSelf only ever flips on. phaseStats is a snapshot: present in payload -> replaces;
+// absent from payload -> prior snapshot preserved; no prior snapshot -> key absent.
 function routePull(roster, payload, now) {
   const id = safeId(payload.owner);
   if (id == null) return { roster, activeId: null };
   const ex = roster[id];
-  const profile = ex
+  const phase = ('phaseStats' in payload && payload.phaseStats != null)
+    ? payload.phaseStats
+    : (ex ? ex.phaseStats : undefined);
+  const base = ex
     ? { ...ex, rows: mergeRows(ex.rows, payload.rows),
         name: (ex.name && ex.name !== ex.cfnId) ? ex.name : (payload.name || ex.name),
         isSelf: ex.isSelf || !!payload.isSelf,
         updatedAt: now }
     : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
+  const profile = phase ? { ...base, phaseStats: phase } : base;
   return { roster: { ...roster, [id]: profile }, activeId: id };
 }
 
@@ -373,20 +378,21 @@ function parseBattlelog(nextData, myShortId, names) {
 }
 
 // Accept a full __NEXT_DATA__ dict or the compact {owner,name,isSelf,replays} blob and
-// return {owner, name, isSelf, rows}. Older {owner,replays} blobs still parse.
+// return {owner, name, isSelf, rows, phaseStats}. Older {owner,replays} blobs still parse.
 function parsePayload(payload, names) {
+  const phaseStats = parsePhaseStats(payload.phaseRaw ?? null, names);
   if (payload?.props?.pageProps?.replay_list) {
     const pp = payload.props.pageProps;
     const owner = pp.fighter_banner_info?.personal_info?.short_id;
     const name = pp.fighter_banner_info?.personal_info?.fighter_id || String(owner);
     const isSelf = pp.common?.loginUser?.shortId != null
       && Number(pp.common.loginUser.shortId) === Number(owner);
-    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names) };
+    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names), phaseStats };
   }
   if (payload?.owner != null && Array.isArray(payload.replays)) {
     const nd = { props: { pageProps: { replay_list: payload.replays } } };
     return { owner: payload.owner, name: payload.name || String(payload.owner),
-             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names) };
+             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names), phaseStats };
   }
   throw new Error('unrecognized battlelog payload');
 }
