@@ -404,22 +404,31 @@ function parsePhaseStats(phaseRaw, names) {
   const pair = (win, battle) => { const b = cnt(battle); return [Math.min(cnt(win), b), b]; };
   const perChar = {};
   for (const c of phaseRaw.character_win_rates) {
+    if (!c || typeof c !== 'object') continue;
     if (c.character_id === 0) continue;
-    const name = nm(c.character_alpha); const [w, b] = pair(c.win_count, c.battle_count);
+    const name = nm(c.character_alpha);
+    const [w, b] = pair(c.win_count, c.battle_count);
     if (!name || b === 0) continue;
     perChar[name] = [w, b];
   }
   const byId = {};
-  for (const c of phaseRaw.character_win_rates) byId[c.character_id] = c.character_alpha;
+  for (const c of phaseRaw.character_win_rates) {
+    if (!c || typeof c !== 'object') continue;
+    byId[c.character_id] = c.character_alpha;
+  }
   const perMatchup = {};
   for (const rec of phaseRaw.character_win_rates_by_rival_character || []) {
+    if (!rec || typeof rec !== 'object') continue;
     if (rec.character_id === 0) continue;
-    const name = nm(byId[rec.character_id]);
+    const alpha = byId[rec.character_id];
+    if (alpha === undefined) continue;
+    const name = nm(alpha);
     if (!name) continue;
     const mm = {};
     for (const m of rec.rival_character_win_rates || []) {
       if (m.rival_character_id === 0) continue;
-      const opp = nm(m.rival_character_alpha); const [w, b] = pair(m.win_count, m.battle_count);
+      const opp = nm(m.rival_character_alpha);
+      const [w, b] = pair(m.win_count, m.battle_count);
       if (!opp || b === 0) continue;
       mm[opp] = [w, b];
     }

@@ -63,3 +63,15 @@ def test_parse_phase_clamps_win_to_battle():
 
 def test_parse_phase_absent_returns_none():
     assert run('parsePhaseStats', {'phaseRaw': None, 'names': NAMES}) is None
+
+def test_parse_phase_coerces_bad_counts():
+    raw = {
+        'current_season_id': 5,
+        'character_win_rates': [
+            {'character_id': 32, 'character_alpha': 'TERRY', 'win_count': -5, 'battle_count': 10},
+            {'character_id': 1,  'character_alpha': 'RYU',   'win_count': 'abc', 'battle_count': None},
+        ],
+        'character_win_rates_by_rival_character': [],
+    }
+    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY', 'RYU']})
+    assert ps['perChar'] == {'TERRY': [0, 10]}   # -5 -> 0 (clamped non-negative); RYU battle None -> 0 -> dropped
