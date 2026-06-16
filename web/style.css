@@ -747,3 +747,58 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .cc-tag.personal { color: var(--t-dis); border-color: var(--t-dis); }
 .cc-tag.hard { color: var(--text-dim); }
 .cc-tag.small { opacity: 0.7; }
+
+/* ---------- Import wizard help button (beside the bookmarklet) ---------- */
+.scout-wiz-help {
+  align-self: flex-start; margin-top: 0.2rem;
+  width: 1.4rem; height: 1.4rem; border-radius: 50%;
+  background: rgba(110,139,255,0.1); border: 1px solid rgba(110,139,255,0.4);
+  color: var(--accent); font-family: var(--font-display); font-size: 0.8rem; font-weight: 700;
+  line-height: 1; cursor: pointer; padding: 0;
+  transition: background var(--dur) var(--ease);
+}
+.scout-wiz-help:hover { background: rgba(110,139,255,0.22); }
+
+/* ---------- First-run import wizard modal ---------- */
+.import-wizard {
+  position: fixed; inset: 0; z-index: 900;
+  background: rgba(5,8,15,0.78);
+  display: flex; align-items: center; justify-content: center;
+  animation: wiz-bg-in 200ms var(--ease);
+}
+@keyframes wiz-bg-in { from { opacity: 0; } to { opacity: 1; } }
+.import-wizard-card {
+  width: 28rem; max-width: calc(100vw - 2rem);
+  background: linear-gradient(180deg, var(--raised), var(--surface));
+  border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(110,139,255,0.08);
+  padding: 1.4rem 1.6rem 1.2rem;
+  display: flex; flex-direction: column; gap: 1rem;
+  animation: wiz-card-in 220ms var(--ease);
+}
+@keyframes wiz-card-in { from { opacity: 0; transform: translateY(-8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.import-wizard-head { display: flex; align-items: center; justify-content: space-between; }
+.import-wizard-title {
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 700;
+  letter-spacing: 0.03em; color: var(--text);
+}
+.import-wizard-close {
+  background: none; border: none; color: var(--text-dim); font-size: 1.3rem;
+  line-height: 1; cursor: pointer; padding: 0 0.2rem;
+}
+.import-wizard-close:hover { color: var(--text); }
+.import-wizard-steps {
+  margin: 0; padding-left: 1.2rem;
+  display: flex; flex-direction: column; gap: 0.55rem;
+  color: var(--text-dim); font-size: 0.82rem; line-height: 1.5;
+}
+.import-wizard-steps li::marker { color: var(--accent); font-weight: 700; font-family: var(--font-display); }
+.import-wizard-done {
+  align-self: flex-end;
+  font-family: var(--font-display); font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em;
+  color: #0B0E16; background: var(--accent); border: none; border-radius: 7px;
+  padding: 0.5rem 1.2rem; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(110,139,255,0.3);
+  transition: opacity var(--dur) var(--ease);
+}
+.import-wizard-done:hover { opacity: 0.88; }

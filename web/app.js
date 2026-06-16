@@ -17,6 +17,7 @@ const state = {
   roster: {},             // {cfnId: profile} — persisted player histories
   activeProfileId: null,  // which profile the scout/views read
   personalMode: false,    // read views through the active profile (shrunk vs baseline)
+  wizardSeen: false,      // true once the import wizard has been dismissed; persisted in IndexedDB meta
 };
 
 // transient status line for the Scout view (set before render(), shown once)
@@ -102,6 +103,7 @@ async function init() {
   wireControls();
   try { state.roster = await loadRoster(); } catch (e) { state.roster = {}; }
   for (const p of Object.values(state.roster)) { if (p.phaseStats) p.phaseStats = migratePhaseStats(p.phaseStats); }
+  try { state.wizardSeen = !!(await getMeta('wizardSeen')); } catch (e) { state.wizardSeen = false; }
   const ids = rosterList();
   if (ids.length) { state.activeProfileId = ids[0].cfnId; $('#personal-toggle').disabled = false; }
   render();
@@ -1068,6 +1070,7 @@ function scoutInputsHtml(compact) {
         <span class="scout-method-title">${t('scoutBmTitle')}</span>
         <p class="scout-method-hint">${t('scoutBmHint')}</p>
         <a class="scout-bm" id="scout-bm" href="#" draggable="true">⚡ ${t('scoutBmLabel')}</a>
+        <button class="scout-wiz-help" id="scout-wiz-help" aria-label="${t('wizReopen')}">?</button>
       </div>
     </div>
     <div class="scout-method">
@@ -1184,6 +1187,45 @@ function renderTrend() {
     <path class="trend-line" d="${line}" fill="none"/>${dots}${xlabels}</svg></div>`;
 }
 
+function renderImportWizard() {
+  // Remove any existing wizard before inserting a new one
+  document.getElementById('import-wizard')?.remove();
+  const el = document.createElement('div');
+  el.id = 'import-wizard';
+  el.className = 'import-wizard';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'wiz-title');
+  el.innerHTML = `<div class="import-wizard-card">
+    <div class="import-wizard-head">
+      <span id="wiz-title" class="import-wizard-title">${t('wizTitle')}</span>
+      <button class="import-wizard-close" aria-label="${t('wizDone')}">×</button>
+    </div>
+    <ol class="import-wizard-steps">
+      <li>${t('wizStep1')}</li>
+      <li>${t('wizStep2')}</li>
+      <li>${t('wizStep3')}</li>
+      <li>${t('wizStep4')}</li>
+    </ol>
+    <button class="import-wizard-done">${t('wizDone')}</button>
+  </div>`;
+  document.body.appendChild(el);
+
+  function close() {
+    el.remove();
+    state.wizardSeen = true;
+    setMeta('wizardSeen', true).catch(() => {});
+  }
+
+  el.querySelector('.import-wizard-close').addEventListener('click', close);
+  el.querySelector('.import-wizard-done').addEventListener('click', close);
+  // Clicking the backdrop (outside the card) also closes
+  el.addEventListener('click', e => { if (e.target === el) close(); });
+  // Escape key
+  function onKey(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } }
+  document.addEventListener('keydown', onKey);
+}
+
 function renderScout() {
   $('#reliab-legend').hidden = true;
   $('#hero-summary').innerHTML = '';
@@ -1192,6 +1234,8 @@ function renderScout() {
     $('#caption').innerHTML = t('scoutIntro');
     $('#lanes').innerHTML = scoutStatusHtml() + scoutInputsHtml(false);
     wireScoutInputs();
+    // Show wizard on first visit (no profiles yet and not previously dismissed)
+    if (!state.wizardSeen && rosterList().length === 0) renderImportWizard();
     return;
   }
 
@@ -1282,6 +1326,7 @@ function wireScoutInputs() {
     // dragged to the bookmarks bar and clicked on the Buckler site instead.
     bm.addEventListener('click', e => { e.preventDefault(); scoutMsg(t('scoutBmDrag')); render(); });
   }
+  $('#scout-wiz-help')?.addEventListener('click', () => renderImportWizard());
   $('#scout-paste-go')?.addEventListener('click', () => ingestPayloadText($('#scout-paste')?.value));
   $('#scout-file')?.addEventListener('change', e => {
     const f = e.target.files?.[0]; if (f) ingestCsvFile(f);
