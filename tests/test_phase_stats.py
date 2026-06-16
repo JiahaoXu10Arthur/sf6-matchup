@@ -295,3 +295,25 @@ def test_routepull_no_slice_preserves():
     p2 = {'owner': '5', 'name': 'P', 'rows': []}
     r2 = run('routePull', {'roster': r1['roster'], 'payload': p2, 'now': 2})
     assert list(r2['roster']['5']['phaseStats']['slices'].keys()) == ['ranked:12']
+
+def test_sanitize_keyed_slices():
+    dirty = {'defaultSlice': 'ranked:12', 'slices': {
+        'ranked:12': {'mode':'ranked','phase':12,'perChar':{'TERRY':[212,424],'<img>':[9,9]},
+                      'perMatchup':{'TERRY':{'MARISA':['1','7'],'BADGUY':[2,2]}}}}}
+    clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY','MARISA']})
+    sl = clean['slices']['ranked:12']
+    assert sl['perChar'] == {'TERRY': [212, 424]}
+    assert sl['perMatchup'] == {'TERRY': {'MARISA': [1, 7]}}
+
+def test_sanitize_migrates_v1_flat_on_import():
+    flat = {'seasonId': 9, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}
+    clean = run('sanitizePhaseStats', {'ps': flat, 'names': ['TERRY']})
+    assert 'all:9' in clean['slices']
+
+def test_mergerosters_deep_merges_slices():
+    base = {'5': {'cfnId':'5','name':'P','isSelf':False,'rows':[],'updatedAt':1,
+                  'phaseStats':{'defaultSlice':'ranked:12','slices':{'ranked:12':{'mode':'ranked','phase':12,'perChar':{'TERRY':[1,2]},'perMatchup':{}}}}}}
+    inc  = {'5': {'cfnId':'5','name':'P','isSelf':False,'rows':[],'updatedAt':2,
+                  'phaseStats':{'defaultSlice':'ranked:11','slices':{'ranked:11':{'mode':'ranked','phase':11,'perChar':{'TERRY':[3,4]},'perMatchup':{}}}}}}
+    out = run('mergeRosters', {'base': base, 'incoming': inc})
+    assert sorted(out['5']['phaseStats']['slices'].keys()) == ['ranked:11', 'ranked:12']

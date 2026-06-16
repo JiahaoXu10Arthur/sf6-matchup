@@ -207,6 +207,15 @@ function routePull(roster, payload, now) {
   return { roster: { ...roster, [id]: profile }, activeId: id };
 }
 
+// Merge two (possibly v1-flat) phaseStats by union of slices; incoming wins on key clash
+// and sets the default. Either side may be undefined.
+function mergePhaseStats(a, b) {
+  const A = migratePhaseStats(a), B = migratePhaseStats(b);
+  if (!A) return B; if (!B) return A;
+  const slices = { ...A.slices, ...B.slices };
+  return { defaultSlice: B.defaultSlice || A.defaultSlice, slices };
+}
+
 // merge an imported roster into a base roster: per-profile dedupe by replay_id; the
 // newer updatedAt wins the name; max updatedAt kept.
 function mergeRosters(base, incoming) {
@@ -220,7 +229,7 @@ function mergeRosters(base, incoming) {
           name: incU > curU ? inc.name : cur.name,
           isSelf: cur.isSelf || inc.isSelf,
           updatedAt: Math.max(curU, incU),
-          phaseStats: inc.phaseStats ?? cur.phaseStats }
+          phaseStats: mergePhaseStats(cur.phaseStats, inc.phaseStats) }
       : { ...inc, updatedAt: incU };
   }
   return out;
@@ -543,35 +552,41 @@ function parsePhaseSlice(rawSlice, names) {
   return { mode, phase, perChar, perMatchup };
 }
 
-// Re-validate a stored phaseStats object (untrusted roster import): keep only roster-known
-// char/rival keys, coerce counts to non-negative ints, clamp win <= battle, drop zero-battle
-// entries — the same guarantees parsePhaseStats produces. Returns null if nothing valid remains.
+// Re-validate an untrusted (imported) phaseStats: migrate v1 flat -> v2, then for each slice
+// keep only roster-known char/rival keys, _cntInt-coerce + clamp win<=battle, drop zero-battle
+// and empty slices. Returns null if nothing valid remains.
 function sanitizePhaseStats(ps, names) {
   if (!ps || typeof ps !== 'object') return null;
+  const v2 = migratePhaseStats(ps);
+  if (!v2 || !v2.slices) return null;
   const known = new Set(Object.values(buildOfficialMap(names)));
-  const cnt = _cntInt;
-  const pair = (w, b0) => { const b = cnt(b0); return [Math.min(cnt(w), b), b]; };
-  const perChar = {};
-  for (const [k, v] of Object.entries(ps.perChar || {})) {
-    if (!known.has(k) || !Array.isArray(v)) continue;
-    const [w, b] = pair(v[0], v[1]);
-    if (b === 0) continue;
-    perChar[k] = [w, b];
-  }
-  const perMatchup = {};
-  for (const [k, mm] of Object.entries(ps.perMatchup || {})) {
-    if (!known.has(k) || !mm || typeof mm !== 'object') continue;
-    const clean = {};
-    for (const [o, v] of Object.entries(mm)) {
-      if (!known.has(o) || !Array.isArray(v)) continue;
-      const [w, b] = pair(v[0], v[1]);
-      if (b === 0) continue;
-      clean[o] = [w, b];
+  const pair = (w, b0) => { const b = _cntInt(b0); return [Math.min(_cntInt(w), b), b]; };
+  const cleanMap = (obj, nested) => {
+    const out = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (!known.has(k)) continue;
+      if (nested) {
+        if (!v || typeof v !== 'object') continue;
+        const inner = {};
+        for (const [o, vv] of Object.entries(v)) { if (known.has(o) && Array.isArray(vv)) { const p = pair(vv[0], vv[1]); if (p[1] > 0) inner[o] = p; } }
+        if (Object.keys(inner).length) out[k] = inner;
+      } else if (Array.isArray(v)) { const p = pair(v[0], v[1]); if (p[1] > 0) out[k] = p; }
     }
-    if (Object.keys(clean).length) perMatchup[k] = clean;
+    return out;
+  };
+  const slices = {};
+  for (const [key, sl] of Object.entries(v2.slices)) {
+    if (!sl || typeof sl !== 'object') continue;
+    const perChar = cleanMap(sl.perChar, false);
+    const perMatchup = cleanMap(sl.perMatchup, true);
+    if (!Object.keys(perChar).length && !Object.keys(perMatchup).length) continue;
+    slices[key] = { mode: typeof sl.mode === 'string' ? sl.mode : 'ranked',
+                    phase: Number.isFinite(Number(sl.phase)) ? Number(sl.phase) : null,
+                    perChar, perMatchup, capturedAt: _cntInt(sl.capturedAt) };
   }
-  if (!Object.keys(perChar).length && !Object.keys(perMatchup).length) return null;
-  return { seasonId: Number.isFinite(ps.seasonId) ? ps.seasonId : null, perChar, perMatchup };
+  if (!Object.keys(slices).length) return null;
+  const defaultSlice = slices[v2.defaultSlice] ? v2.defaultSlice : Object.keys(slices)[0];
+  return { defaultSlice, slices };
 }
 
 /* ---------- personal CSV round-trip (mirror fetch_battlelog CSV_FIELDS) ---------- */
@@ -651,7 +666,7 @@ if (typeof module !== 'undefined') {
     personalRow, personalEncounter,
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
     mrSlope, matchupGaps, applyMrBridge,
-    monthOf, newProfile, migratePhaseStats, routePull, mergeRosters, safeId,
+    monthOf, newProfile, migratePhaseStats, mergePhaseStats, routePull, mergeRosters, safeId,
     buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseSlice, _mapWinRates, sanitizePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
