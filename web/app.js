@@ -768,6 +768,15 @@ function renderCoach() {
   const ranked = prioritize(diagnoseFromBaseline(baseline, agg, opts), freq).filter(d => d.score > 0);
   let phaseBlock = '';
   if (phase) {
+    const sliceOpts = Object.values(ps.slices)
+      .sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0))
+      .map(sl => {
+        const k = sl.mode + ':' + sl.phase;
+        const lbl = t('coachSliceOpt', { p: sl.phase === -1 ? 'Total' : sl.phase, m: sl.mode });
+        return `<option value="${escapeHtml(k)}"${k === sliceKey ? ' selected' : ''}>${escapeHtml(lbl)}</option>`;
+      })
+      .join('');
+    const sliceSel = `<label class="coach-slice">${t('coachSliceLabel')} <select id="coach-slice-sel">${sliceOpts}</select></label>`;
     const charRec = slice.perChar && slice.perChar[char];
     const charRateLine = charRec
       ? `<div class="coach-charrate">${t('coachCharRate', { char: escapeHtml(cn(char)), w: Math.round(charRec[0] / charRec[1] * 100), win: charRec[0], n: charRec[1] })}</div>`
@@ -775,9 +784,13 @@ function renderCoach() {
     const seasonLine = `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: escapeHtml(String(slice.phase)), m: escapeHtml(String(slice.mode)) })}</div>`;
     const alphaVal = state.coachAlpha.toFixed(2);
     const offHint = state.coachAlpha === 0 ? ` <span class="coach-blend-off">${t('coachBlendOff')}</span>` : '';
-    phaseBlock = `<div class="coach-blend">${charRateLine}${seasonLine}<label class="coach-blend-label">${t('coachBlend')} <span class="coach-blend-val">${alphaVal}</span>${offHint}<input id="coach-alpha-range" class="coach-blend-range" type="range" min="0" max="1" step="0.05" value="${alphaVal}" aria-label="${t('coachBlend')}"></label></div>`;
+    phaseBlock = `<div class="coach-blend">${sliceSel}${charRateLine}${seasonLine}<label class="coach-blend-label">${t('coachBlend')} <span class="coach-blend-val">${alphaVal}</span>${offHint}<input id="coach-alpha-range" class="coach-blend-range" type="range" min="0" max="1" step="0.05" value="${alphaVal}" aria-label="${t('coachBlend')}"></label></div>`;
   }
-  const wireBlend = () => { if (phase) { const el = $('#coach-alpha-range'); if (el) el.addEventListener('input', e => { state.coachAlpha = Number(e.target.value); renderCoach(); }); } };
+  const wireBlend = () => {
+    if (!phase) return;
+    const el = $('#coach-alpha-range'); if (el) el.addEventListener('input', e => { state.coachAlpha = Number(e.target.value); renderCoach(); });
+    const ssel = $('#coach-slice-sel'); if (ssel) ssel.addEventListener('change', e => { state.coachSlice = e.target.value; renderCoach(); });
+  };
   $('#caption').innerHTML = t('coachCaption', { char: cn(char) });
   if (!ranked.length) {
     $('#lanes').innerHTML = `${phaseBlock}<div class="lane-empty">${t('coachNoGaps', { char: cn(char) })}</div>`;

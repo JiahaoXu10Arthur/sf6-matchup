@@ -736,6 +736,8 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .coach-blend-val { font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 2.2rem; }
 .coach-blend-off { font-family: var(--font-display); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--t-dis); border: 1px solid var(--t-dis); border-radius: 3px; padding: 0.05rem 0.3rem; opacity: 0.85; }
 .coach-blend-range { flex: 1; min-width: 6rem; }
+.coach-slice { display: flex; align-items: center; gap: 0.55rem; font-family: var(--font-display); font-size: 0.72rem; font-weight: 600; color: var(--text-dim); }
+.coach-slice select { font-family: var(--font-display); font-size: 0.72rem; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 0.15rem 0.4rem; cursor: pointer; }
 .cc-rank { font-family: var(--font-display); font-weight: 800; color: var(--text-dim); }
 .cc-opp { display: flex; align-items: center; gap: 0.45rem; font-family: var(--font-display); font-weight: 600; }
 .cc-rate small { color: var(--text-dim); font-size: 0.7rem; }
