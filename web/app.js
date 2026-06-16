@@ -934,10 +934,16 @@ function loadParsedRows(payload) {
   state.roster = roster;
   state.activeProfileId = activeId;
   saveProfile(roster[activeId]);                 // persist (async, fire-and-forget)
-  const tgl = $('#personal-toggle'); if (tgl) tgl.disabled = false;   // enable Personal mode
-  scoutMsg(t('scoutLoaded', { added, total: roster[activeId].rows.length }));
+  const tgl = $('#personal-toggle'); if (tgl) { tgl.disabled = false; tgl.checked = true; }
+  state.personalMode = true;                       // auto-enable Personal mode
+  const sliceMsg = (clean.phaseSlice && clean.phaseSlice.phase != null)
+    ? t('scoutLoadedSlice', { p: clean.phaseSlice.phase, m: clean.phaseSlice.mode, n: roster[activeId].rows.length })
+    : t('scoutLoaded', { added, total: roster[activeId].rows.length });
+  scoutMsg(sliceMsg);
+  state.coachSlice = clean.phaseSlice ? (clean.phaseSlice.mode + ':' + clean.phaseSlice.phase) : state.coachSlice;
+  state.view = 'threats';                          // jump to Coach view (internal id 'threats')
   const main = mostPlayed(roster[activeId].rows);
-  if (main && idx[main]) selectChar(main);   // selectChar re-renders
+  if (main && idx[main]) selectChar(main);         // selectChar re-renders the (now Coach) view
   else render();
 }
 
