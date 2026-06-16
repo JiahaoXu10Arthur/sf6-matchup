@@ -14,5 +14,6 @@ else if (mode === 'safeId') out = s.safeId(arg.id);
 else if (mode === 'skillMatchedAgg') out = s.skillMatchedAgg(arg.rows, arg.char, arg.opts);
 else if (mode === 'diagnoseFromBaseline') out = s.diagnoseFromBaseline(arg.baseline, arg.agg);
 else if (mode === 'prioritize') out = s.prioritize(arg.diagnoses, arg.usage);
+else if (mode === 'classify') out = s.classify(arg.p0, arg.wins, arg.losses, arg.opts || {});
 else throw new Error('unknown mode ' + mode);
 console.log(JSON.stringify(out));

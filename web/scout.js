@@ -109,6 +109,7 @@ const DELTA = 0.03;       // min material gap vs baseline (3 percentage points)
 const MIN_TRUST = 10;     // games below which a deviation is "small sample"
 const WEAK_PROB = 0.85;   // P(true < baseline) needed to call a real weakness
 const STRONG_PROB = 0.15; // symmetric threshold for overperforming
+const PHASE_CAP = 40;     // max phase pseudo-games entering the prior (≈2× KAPPA)
 
 // Classify one matchup given baseline win-rate p0 (0..1) and your wins/losses.
 // Returns {shrunk, lo, hi, probBelow, n, verdict, deficit}.
@@ -117,7 +118,12 @@ function classify(p0, wins, losses, opts = {}) {
   const level = opts.level ?? CRED_LEVEL;
   const delta = opts.delta ?? DELTA;
   const minTrust = opts.minTrust ?? MIN_TRUST;
-  const [a, b] = betaPosterior(p0, kappa, wins, losses);
+  let [a, b] = betaPosterior(p0, kappa, wins, losses);
+  const ph = opts.phase;
+  if (ph && ph.alpha > 0 && ph.n > 0 && Number.isFinite(ph.p)) {
+    const m = Math.min(ph.n, opts.phaseCap ?? PHASE_CAP) * ph.alpha;
+    a += m * ph.p; b += m * (1 - ph.p);
+  }
   const mean = posteriorMean(a, b);
   const [lo, hi] = credibleInterval(a, b, level);
   const pb = probBelow(a, b, p0);
@@ -457,7 +463,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     lgamma, regIncompleteBeta, betaPosterior, posteriorMean, betaPpf,
     credibleInterval, probBelow,
-    KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB,
+    KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB, PHASE_CAP,
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
