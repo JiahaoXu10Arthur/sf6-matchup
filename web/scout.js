@@ -472,6 +472,13 @@ function parsePayload(payload, names) {
   throw new Error('unrecognized battlelog payload');
 }
 
+// Coerce a count to a non-negative finite integer; rejects NaN/Infinity/-Infinity/strings
+// like "Infinity" (which Number() would pass through) -> 0. Shared by the phase-stats parsers.
+function _cntInt(v) {
+  const n = Math.trunc(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 // Normalize a Buckler /play `play` blob into {seasonId, perChar, perMatchup}. Maps
 // character_alpha -> official roster name, drops the ANY aggregate (id 0), unknown chars,
 // and zero-battle entries; coerces counts to non-negative ints and clamps win <= battle so
@@ -480,7 +487,7 @@ function parsePhaseStats(phaseRaw, names) {
   if (!phaseRaw || !Array.isArray(phaseRaw.character_win_rates)) return null;
   const map = buildOfficialMap(names);
   const known = new Set(Object.values(map));
-  const cnt = v => Math.max(0, Math.trunc(Number(v) || 0));
+  const cnt = _cntInt;
   const nm = a => { const o = officialName(a, map); return known.has(o) ? o : null; };
   const pair = (win, battle) => { const b = cnt(battle); return [Math.min(cnt(win), b), b]; };
   const perChar = {};
@@ -524,7 +531,7 @@ function parsePhaseStats(phaseRaw, names) {
 function sanitizePhaseStats(ps, names) {
   if (!ps || typeof ps !== 'object') return null;
   const known = new Set(Object.values(buildOfficialMap(names)));
-  const cnt = v => Math.max(0, Math.trunc(Number(v) || 0));
+  const cnt = _cntInt;
   const pair = (w, b0) => { const b = cnt(b0); return [Math.min(cnt(w), b), b]; };
   const perChar = {};
   for (const [k, v] of Object.entries(ps.perChar || {})) {

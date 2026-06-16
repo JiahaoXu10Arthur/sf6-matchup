@@ -182,3 +182,22 @@ def test_sanitize_phase_clamps_and_drops_zero_battle():
 def test_sanitize_phase_empty_or_absent_returns_none():
     assert run('sanitizePhaseStats', {'ps': {'perChar': {}, 'perMatchup': {}}, 'names': ['TERRY']}) is None
     assert run('sanitizePhaseStats', {'ps': None, 'names': ['TERRY']}) is None
+
+def test_sanitize_phase_rejects_infinity_counts():
+    # "Infinity" strings must NOT survive coercion (Number('Infinity') is Infinity).
+    dirty = {'perChar': {'TERRY': ['Infinity', 'Infinity'], 'MARISA': [3, 'Infinity']}}
+    clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY', 'MARISA']})
+    assert clean is None     # both battle counts -> 0 -> dropped -> nothing valid -> None
+
+def test_sanitize_phase_drops_proto_key():
+    dirty = {'perChar': {'__proto__': [5, 10], 'TERRY': [3, 4]}}
+    clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY']})
+    assert clean['perChar'] == {'TERRY': [3, 4]}   # __proto__ not a roster name -> dropped
+
+def test_parse_phase_rejects_infinity_counts():
+    raw = {'current_season_id': 1,
+           'character_win_rates': [
+               {'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 'Infinity', 'battle_count': 'Infinity'}],
+           'character_win_rates_by_rival_character': []}
+    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
+    assert ps['perChar'] == {}     # Infinity battle -> 0 -> dropped
