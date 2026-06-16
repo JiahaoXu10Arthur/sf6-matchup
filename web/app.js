@@ -466,11 +466,7 @@ function wireControls() {
   document.querySelectorAll('.view-switch button').forEach(b =>
     b.addEventListener('click', () => {
       state.view = b.dataset.view;
-      document.querySelectorAll('.view-switch button').forEach(x => {
-        x.classList.toggle('active', x === b); x.setAttribute('aria-selected', x === b);
-      });
-      $('#view-label').textContent = t(VIEW_LABEL[state.view]);
-      render();
+      render();                       // render() syncs the tab highlight + label
     }));
 
   document.querySelectorAll('.lang-switch button').forEach(b =>
@@ -511,6 +507,14 @@ function render() {
   closeCharCard();
   updateTierState();
   paintUsageBadges();
+  // Keep the nav highlight + label in sync with the active view — not only on
+  // click, so a programmatic view change (e.g. the post-paste jump) updates the
+  // tab too, instead of leaving the old tab highlighted over new content.
+  document.querySelectorAll('.view-switch button').forEach(b => {
+    const on = b.dataset.view === state.view;
+    b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
+  });
+  $('#view-label').textContent = t(VIEW_LABEL[state.view]);
   if (state.view === 'match') renderMatch();
   else if (state.view === 'bars') renderBars();
   else if (state.view === 'scatter') renderScatter();
@@ -965,7 +969,7 @@ function loadParsedRows(payload) {
     : t('scoutLoaded', { added, total: roster[activeId].rows.length });
   scoutMsg(sliceMsg);
   state.coachSlice = clean.phaseSlice ? (clean.phaseSlice.mode + ':' + clean.phaseSlice.phase) : state.coachSlice;
-  state.view = 'threats';                          // jump to Coach view (internal id 'threats')
+  state.view = 'scout';                            // land on the Scout matchup table (the imported history)
   const main = mostPlayed(roster[activeId].rows);
   if (main && idx[main]) selectChar(main);         // selectChar re-renders the (now Coach) view
   else render();
