@@ -102,7 +102,7 @@ async function init() {
   buildOppWeights();
   wireControls();
   try { state.roster = await loadRoster(); } catch (e) { state.roster = {}; }
-  for (const p of Object.values(state.roster)) { if (p.phaseStats) p.phaseStats = migratePhaseStats(p.phaseStats); }
+  for (const [id, p] of Object.entries(state.roster)) { if (p.phaseStats) state.roster[id] = { ...p, phaseStats: migratePhaseStats(p.phaseStats) }; }
   try { state.wizardSeen = !!(await getMeta('wizardSeen')); } catch (e) { state.wizardSeen = false; }
   const ids = rosterList();
   if (ids.length) { state.activeProfileId = ids[0].cfnId; $('#personal-toggle').disabled = false; }
@@ -774,8 +774,8 @@ function renderCoach() {
       .sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0))
       .map(sl => {
         const k = sl.mode + ':' + sl.phase;
-        const lbl = t('coachSliceOpt', { p: sl.phase === -1 ? 'Total' : sl.phase, m: sl.mode });
-        return `<option value="${escapeHtml(k)}"${k === sliceKey ? ' selected' : ''}>${escapeHtml(lbl)}</option>`;
+        const lbl = t('coachSliceOpt', { p: sl.phase === -1 ? 'Total' : sl.phase, m: escapeHtml(String(sl.mode)) });
+        return `<option value="${escapeHtml(k)}"${k === sliceKey ? ' selected' : ''}>${lbl}</option>`;
       })
       .join('');
     const sliceSel = `<label class="coach-slice">${t('coachSliceLabel')} <select id="coach-slice-sel">${sliceOpts}</select></label>`;
@@ -1213,6 +1213,7 @@ function renderImportWizard() {
 
   function close() {
     el.remove();
+    document.removeEventListener('keydown', onKey);
     state.wizardSeen = true;
     setMeta('wizardSeen', true).catch(() => {});
   }
@@ -1221,8 +1222,8 @@ function renderImportWizard() {
   el.querySelector('.import-wizard-done').addEventListener('click', close);
   // Clicking the backdrop (outside the card) also closes
   el.addEventListener('click', e => { if (e.target === el) close(); });
-  // Escape key
-  function onKey(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } }
+  // Escape key — listener removed in close() so every close path cleans up
+  function onKey(e) { if (e.key === 'Escape') close(); }
   document.addEventListener('keydown', onKey);
 }
 
@@ -1299,7 +1300,7 @@ function renderScout() {
   });
   $('#scout-dl')?.addEventListener('click', downloadScoutCsv);
   $('#scout-clear')?.addEventListener('click', clearScoutData);
-  $('#sc-profile')?.addEventListener('change', e => { state.activeProfileId = e.target.value; const m = mostPlayed(activeRows()); if (m && idx[m]) selectChar(m); else render(); });
+  $('#sc-profile')?.addEventListener('change', e => { state.activeProfileId = e.target.value; state.coachSlice = null; const m = mostPlayed(activeRows()); if (m && idx[m]) selectChar(m); else render(); });
   $('#rm-export')?.addEventListener('click', exportRoster);
   $('#rm-import-file')?.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) importRosterFile(f); });
   document.querySelectorAll('#lanes .rm-row').forEach(rowEl => {
