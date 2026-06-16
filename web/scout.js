@@ -522,7 +522,8 @@ function parsePhaseStats(phaseRaw, names) {
     }
     if (Object.keys(mm).length) perMatchup[name] = mm;
   }
-  return { seasonId: phaseRaw.current_season_id ?? null, perChar, perMatchup };
+  const sid = phaseRaw.current_season_id;
+  return { seasonId: Number.isFinite(sid) ? sid : null, perChar, perMatchup };
 }
 
 // Re-validate a stored phaseStats object (untrusted roster import): keep only roster-known

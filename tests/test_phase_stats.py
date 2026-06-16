@@ -201,3 +201,18 @@ def test_parse_phase_rejects_infinity_counts():
            'character_win_rates_by_rival_character': []}
     ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
     assert ps['perChar'] == {}     # Infinity battle -> 0 -> dropped
+
+def test_parse_phase_rejects_nonnumeric_season_id():
+    raw = {'current_season_id': '<img src=x onerror=alert(1)>',
+           'character_win_rates': [{'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 1, 'battle_count': 2}],
+           'character_win_rates_by_rival_character': []}
+    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
+    assert ps['seasonId'] is None                 # non-numeric season id rejected at the parse boundary
+    assert ps['perChar'] == {'TERRY': [1, 2]}     # the rest still parses
+
+def test_parse_phase_keeps_numeric_season_id():
+    raw = {'current_season_id': 12,
+           'character_win_rates': [{'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 1, 'battle_count': 2}],
+           'character_win_rates_by_rival_character': []}
+    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
+    assert ps['seasonId'] == 12
