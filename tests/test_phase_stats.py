@@ -216,3 +216,18 @@ def test_parse_phase_keeps_numeric_season_id():
            'character_win_rates_by_rival_character': []}
     ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
     assert ps['seasonId'] == 12
+
+def test_merge_rosters_carries_imported_phasestats():
+    base = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 1,
+                  'phaseStats': {'seasonId': 11, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}}
+    inc  = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 2,
+                  'phaseStats': {'seasonId': 12, 'perChar': {'TERRY': [9, 10]}, 'perMatchup': {}}}}
+    out = run('mergeRosters', {'base': base, 'incoming': inc})
+    assert out['5']['phaseStats']['perChar'] == {'TERRY': [9, 10]}   # incoming replaces
+
+def test_merge_rosters_preserves_phasestats_when_incoming_absent():
+    base = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 1,
+                  'phaseStats': {'seasonId': 11, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}}
+    inc  = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 2}}  # no phaseStats
+    out = run('mergeRosters', {'base': base, 'incoming': inc})
+    assert out['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}    # existing preserved

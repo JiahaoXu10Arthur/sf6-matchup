@@ -121,7 +121,7 @@ function classify(p0, wins, losses, opts = {}) {
   let [a, b] = betaPosterior(p0, kappa, wins, losses);
   const ph = opts.phase;
   if (ph && ph.alpha > 0 && ph.n > 0 && Number.isFinite(ph.p)) {
-    const m = Math.min(ph.n, opts.phaseCap ?? PHASE_CAP) * ph.alpha;
+    const m = Math.min(ph.n, PHASE_CAP) * ph.alpha;
     a += m * ph.p; b += m * (1 - ph.p);
   }
   const mean = posteriorMean(a, b);
@@ -204,7 +204,8 @@ function mergeRosters(base, incoming) {
       ? { ...cur, rows: mergeRows(cur.rows, inc.rows),
           name: incU > curU ? inc.name : cur.name,
           isSelf: cur.isSelf || inc.isSelf,
-          updatedAt: Math.max(curU, incU) }
+          updatedAt: Math.max(curU, incU),
+          phaseStats: inc.phaseStats ?? cur.phaseStats }
       : { ...inc, updatedAt: incU };
   }
   return out;
@@ -356,7 +357,6 @@ function applyMrBridge(p, gap, beta) {
 // Join the weighted personal record (agg) to the global baseline ({opp: 0..1}) and classify
 // each matchup. Splits the gap into personalGap (you below the field) and universalHardness
 // (the matchup is hard for everyone — already encoded in the baseline). Optional opts:
-// opts.phase = {opp:[win,battle]}, opts.alpha, opts.gaps = {opp:gap}, opts.mrBeta.
 // opts: alpha 0..1 blend weight; phase {opp:[win,battle]}; gaps {opp:meanMrGap}; mrBeta logistic slope per 100-MR.
 function diagnoseFromBaseline(baseline, agg, opts = {}) {
   const phase = opts.phase || {};
