@@ -842,6 +842,21 @@ if(!owner){alert(${JSON.stringify(s.noProfile)});return;}
 var meta=nd&&nd.props.pageProps?nd.props.pageProps:{};
 var pname=(meta.fighter_banner_info&&meta.fighter_banner_info.personal_info&&meta.fighter_banner_info.personal_info.fighter_id)||String(owner);
 var lu=meta.common&&meta.common.loginUser?meta.common.loginUser.shortId:null;
+var pickedPhase=await new Promise(function(res){
+var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
+var card=document.createElement('div');card.style.cssText='background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:10px;padding:18px;width:min(360px,92vw);font-family:system-ui,sans-serif';
+var h=document.createElement('p');h.textContent=${JSON.stringify(s.bmPickPhase)};h.style.cssText='margin:0 0 12px;font-size:14px';
+var selp=document.createElement('select');selp.style.cssText='width:100%;padding:8px;margin-bottom:12px;background:#0b0e16;color:#eaeef7;border:1px solid #283047;border-radius:6px';
+for(var ph=12;ph>=-1;ph--){var o=document.createElement('option');o.value=ph;o.textContent=(ph===-1?'Total':'Phase '+ph);selp.appendChild(o);}
+var cur=document.querySelector('select');if(cur&&cur.value!==''&&cur.value!=null)selp.value=cur.value;
+var bar=document.createElement('div');bar.style.cssText='display:flex;gap:8px;justify-content:flex-end';
+var pull=document.createElement('button');pull.textContent=${JSON.stringify(s.bmPull)};pull.style.cssText='padding:7px 16px;border-radius:6px;border:none;background:#6e8bff;color:#0b0e16;font-weight:700;cursor:pointer';
+var cancel=document.createElement('button');cancel.textContent=${JSON.stringify(s.bmCancel)};cancel.style.cssText='padding:7px 16px;border-radius:6px;border:1px solid #283047;background:transparent;color:#eaeef7;cursor:pointer';
+pull.onclick=function(){var v=Number(selp.value);ov.remove();res(v);};
+cancel.onclick=function(){ov.remove();res(null);};
+bar.appendChild(cancel);bar.appendChild(pull);card.appendChild(h);card.appendChild(selp);card.appendChild(bar);ov.appendChild(card);document.body.appendChild(ov);
+});
+if(pickedPhase===null)return;
 var base='https://www.streetfighter.com/6/buckler/profile/'+owner+'/battlelog/rank?page=';
 var pill=document.createElement('div');
 pill.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:8px;padding:10px 14px;font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45)';
@@ -863,13 +878,16 @@ await new Promise(z=>setTimeout(z,500));
 }
 pill.remove();
 if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
-var phaseRaw=null;try{
-var phtml=await fetch('https://www.streetfighter.com/6/buckler/profile/'+owner+'/play',{credentials:'include'}).then(x=>x.text());
-var pdoc=new DOMParser().parseFromString(phtml,'text/html');
-var pel=pdoc.getElementById('__NEXT_DATA__');
-if(pel){phaseRaw=JSON.parse(pel.textContent).props.pageProps.play||null;}
-}catch(e){phaseRaw=null;}
-var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays,phaseRaw:phaseRaw});
+pill.style.display='';pill.textContent=${JSON.stringify(s.bmStatsProgress)};document.body.appendChild(pill);
+var cwr=null,rwr=null;try{
+var rc=await fetch('/6/buckler/api/profile/play/act/characterwinrate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+cwr=rc.response.character_win_rates;pill.textContent=${JSON.stringify(s.bmStatsChar)};
+var rr=await fetch('/6/buckler/api/profile/play/act/characterwinratebyrivalcharacter',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+rwr=rr.response.character_win_rates_by_rival_character;pill.textContent=${JSON.stringify(s.bmStatsRival)};
+}catch(e){cwr=null;rwr=null;}
+pill.remove();
+var phaseSlice=(cwr&&rwr)?{mode:'ranked',phase:pickedPhase,characterWinRates:cwr,rivalWinRates:rwr}:null;
+var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays,phaseSlice:phaseSlice});
 var ov=document.createElement('div');
 ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
 var card=document.createElement('div');
@@ -1257,6 +1275,8 @@ function wireScoutInputs() {
     bm.href = scoutBookmarklet({
       noProfile: t('bmNoProfile'), progress: t('bmProgress'), noMatches: t('bmNoMatches'),
       done: t('bmDone'), copy: t('bmCopy'), copied: t('bmCopied'), close: t('bmClose'), failed: t('bmFailed'),
+      bmPickPhase: t('bmPickPhase'), bmPull: t('bmPull'), bmCancel: t('bmCancel'),
+      bmStatsProgress: t('bmStatsProgress'), bmStatsChar: t('bmStatsChar'), bmStatsRival: t('bmStatsRival'),
     });
     // clicking it here would run in our origin (CORS-blocked) — it's meant to be
     // dragged to the bookmarks bar and clicked on the Buckler site instead.
