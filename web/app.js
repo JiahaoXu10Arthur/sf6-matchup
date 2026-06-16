@@ -12,9 +12,12 @@ const state = {
   usageW: {},             // per-opponent usage-weight override (sparse; absent = auto from play rate)
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
   useUsage: true,         // weight opponents by play rate (down-weights rare chars)
+  coachAlpha: 0.7,        // Buckler phase-stats blend weight: 0 = ignore, 1 = full
+  coachSlice: null,       // active phaseStats slice key; null -> profile defaultSlice
   roster: {},             // {cfnId: profile} — persisted player histories
   activeProfileId: null,  // which profile the scout/views read
   personalMode: false,    // read views through the active profile (shrunk vs baseline)
+  wizardSeen: false,      // true once the import wizard has been dismissed; persisted in IndexedDB meta
 };
 
 // transient status line for the Scout view (set before render(), shown once)
@@ -99,6 +102,8 @@ async function init() {
   buildOppWeights();
   wireControls();
   try { state.roster = await loadRoster(); } catch (e) { state.roster = {}; }
+  for (const [id, p] of Object.entries(state.roster)) { if (p.phaseStats) state.roster[id] = { ...p, phaseStats: migratePhaseStats(p.phaseStats) }; }
+  try { state.wizardSeen = !!(await getMeta('wizardSeen')); } catch (e) { state.wizardSeen = false; }
   const ids = rosterList();
   if (ids.length) { state.activeProfileId = ids[0].cfnId; $('#personal-toggle').disabled = false; }
   render();
@@ -754,10 +759,48 @@ function renderCoach() {
   const agg = skillMatchedAgg(rows, char);
   const baseline = baselineWinrates(idx, char, state.monthW, exclude(), state.tierW);
   const freq = personalEncounter(rows, char);
-  const ranked = prioritize(diagnoseFromBaseline(baseline, agg), freq).filter(d => d.score > 0);
+  const psRaw = activeProfile() && activeProfile().phaseStats;
+  const ps = psRaw && psRaw.slices ? psRaw : null;
+  const sliceKey = ps ? (ps.slices[state.coachSlice] ? state.coachSlice : ps.defaultSlice) : null;
+  const slice = ps && sliceKey ? ps.slices[sliceKey] : null;
+  const phase = (slice && slice.perMatchup && slice.perMatchup[char]) || null;
+  const opts = phase
+    ? { phase, alpha: state.coachAlpha, mrBeta: mrSlope(rows, char).beta, gaps: matchupGaps(rows, char) }
+    : {};
+  const ranked = prioritize(diagnoseFromBaseline(baseline, agg, opts), freq).filter(d => d.score > 0);
+  let phaseBlock = '';
+  if (phase) {
+    const sliceOpts = Object.values(ps.slices)
+      .sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0))
+      .map(sl => {
+        const k = sl.mode + ':' + sl.phase;
+        const lbl = t('coachSliceOpt', { p: sl.phase === -1 ? 'Total' : sl.phase, m: escapeHtml(String(sl.mode)) });
+        return `<option value="${escapeHtml(k)}"${k === sliceKey ? ' selected' : ''}>${lbl}</option>`;
+      })
+      .join('');
+    const sliceSel = `<label class="coach-slice">${t('coachSliceLabel')} <select id="coach-slice-sel">${sliceOpts}</select></label>`;
+    const charRec = slice.perChar && slice.perChar[char];
+    const charRateLine = charRec
+      ? `<div class="coach-charrate">${t('coachCharRate', { char: escapeHtml(cn(char)), w: Math.round(charRec[0] / charRec[1] * 100), win: charRec[0], n: charRec[1] })}</div>`
+      : '';
+    const seasonLine = `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: escapeHtml(String(slice.phase)), m: escapeHtml(String(slice.mode)) })}</div>`;
+    const alphaVal = state.coachAlpha.toFixed(2);
+    const offHint = state.coachAlpha === 0 ? ` <span class="coach-blend-off">${t('coachBlendOff')}</span>` : '';
+    phaseBlock = `<div class="coach-blend">${sliceSel}${charRateLine}${seasonLine}<label class="coach-blend-label">${t('coachBlend')} <span class="coach-blend-val">${alphaVal}</span>${offHint}<input id="coach-alpha-range" class="coach-blend-range" type="range" min="0" max="1" step="0.05" value="${alphaVal}" aria-label="${t('coachBlend')}"></label></div>`;
+  }
+  const wireBlend = () => {
+    if (!phase) return;
+    const el = $('#coach-alpha-range'); if (el) el.addEventListener('input', e => { state.coachAlpha = Number(e.target.value); renderCoach(); });
+    const ssel = $('#coach-slice-sel'); if (ssel) ssel.addEventListener('change', e => { state.coachSlice = e.target.value; renderCoach(); });
+  };
   $('#caption').innerHTML = t('coachCaption', { char: cn(char) });
-  if (!ranked.length) { $('#lanes').innerHTML = `<div class="lane-empty">${t('coachNoGaps', { char: cn(char) })}</div>`; return; }
-  $('#lanes').innerHTML = `<div class="coach-list">${ranked.slice(0, 5).map((d, i) => coachCard(d, i, freq)).join('')}</div>`;
+  if (!ranked.length) {
+    $('#lanes').innerHTML = `${phaseBlock}<div class="lane-empty">${t('coachNoGaps', { char: cn(char) })}</div>`;
+    wireBlend();
+    return;
+  }
+  $('#lanes').innerHTML = `${phaseBlock}<div class="coach-list">${ranked.slice(0, 5).map((d, i) => coachCard(d, i, freq)).join('')}</div>`;
+  wireBlend();
   document.querySelectorAll('#lanes .sc-pocket-go').forEach(el => {
     const go = e => { e.stopPropagation(); if (idx[el.dataset.pocket]) openCharCard(el.dataset.pocket, el); };
     el.addEventListener('click', go);
@@ -801,6 +844,21 @@ if(!owner){alert(${JSON.stringify(s.noProfile)});return;}
 var meta=nd&&nd.props.pageProps?nd.props.pageProps:{};
 var pname=(meta.fighter_banner_info&&meta.fighter_banner_info.personal_info&&meta.fighter_banner_info.personal_info.fighter_id)||String(owner);
 var lu=meta.common&&meta.common.loginUser?meta.common.loginUser.shortId:null;
+var pickedPhase=await new Promise(function(res){
+var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
+var card=document.createElement('div');card.style.cssText='background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:10px;padding:18px;width:min(360px,92vw);font-family:system-ui,sans-serif';
+var h=document.createElement('p');h.textContent=${JSON.stringify(s.bmPickPhase)};h.style.cssText='margin:0 0 12px;font-size:14px';
+var selp=document.createElement('select');selp.style.cssText='width:100%;padding:8px;margin-bottom:12px;background:#0b0e16;color:#eaeef7;border:1px solid #283047;border-radius:6px';
+for(var ph=12;ph>=-1;ph--){var o=document.createElement('option');o.value=ph;o.textContent=(ph===-1?'Total':'Phase '+ph);selp.appendChild(o);}
+var cur=document.querySelector('select');if(cur&&cur.value!==''&&cur.value!=null)selp.value=cur.value;
+var bar=document.createElement('div');bar.style.cssText='display:flex;gap:8px;justify-content:flex-end';
+var pull=document.createElement('button');pull.textContent=${JSON.stringify(s.bmPull)};pull.style.cssText='padding:7px 16px;border-radius:6px;border:none;background:#6e8bff;color:#0b0e16;font-weight:700;cursor:pointer';
+var cancel=document.createElement('button');cancel.textContent=${JSON.stringify(s.bmCancel)};cancel.style.cssText='padding:7px 16px;border-radius:6px;border:1px solid #283047;background:transparent;color:#eaeef7;cursor:pointer';
+pull.onclick=function(){var v=Number(selp.value);ov.remove();res(v);};
+cancel.onclick=function(){ov.remove();res(null);};
+bar.appendChild(cancel);bar.appendChild(pull);card.appendChild(h);card.appendChild(selp);card.appendChild(bar);ov.appendChild(card);document.body.appendChild(ov);
+});
+if(pickedPhase===null)return;
 var base='https://www.streetfighter.com/6/buckler/profile/'+owner+'/battlelog/rank?page=';
 var pill=document.createElement('div');
 pill.style.cssText='position:fixed;top:16px;right:16px;z-index:2147483647;background:#131826;color:#eaeef7;border:1px solid #283047;border-radius:8px;padding:10px 14px;font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.45)';
@@ -822,7 +880,16 @@ await new Promise(z=>setTimeout(z,500));
 }
 pill.remove();
 if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
-var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays});
+pill.style.display='';pill.textContent=${JSON.stringify(s.bmStatsProgress)};document.body.appendChild(pill);
+var cwr=null,rwr=null;try{
+var rc=await fetch('/6/buckler/api/profile/play/act/characterwinrate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+cwr=rc.response.character_win_rates;pill.textContent=${JSON.stringify(s.bmStatsChar)};
+var rr=await fetch('/6/buckler/api/profile/play/act/characterwinratebyrivalcharacter',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+rwr=rr.response.character_win_rates_by_rival_character;pill.textContent=${JSON.stringify(s.bmStatsRival)};
+}catch(e){cwr=null;rwr=null;}
+pill.remove();
+var phaseSlice=(cwr&&rwr)?{mode:'ranked',phase:pickedPhase,characterWinRates:cwr,rivalWinRates:rwr}:null;
+var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays,phaseSlice:phaseSlice});
 var ov=document.createElement('div');
 ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
 var card=document.createElement('div');
@@ -887,10 +954,16 @@ function loadParsedRows(payload) {
   state.roster = roster;
   state.activeProfileId = activeId;
   saveProfile(roster[activeId]);                 // persist (async, fire-and-forget)
-  const tgl = $('#personal-toggle'); if (tgl) tgl.disabled = false;   // enable Personal mode
-  scoutMsg(t('scoutLoaded', { added, total: roster[activeId].rows.length }));
+  const tgl = $('#personal-toggle'); if (tgl) { tgl.disabled = false; tgl.checked = true; }
+  state.personalMode = true;                       // auto-enable Personal mode
+  const sliceMsg = (clean.phaseSlice && clean.phaseSlice.phase != null)
+    ? t('scoutLoadedSlice', { p: clean.phaseSlice.phase, m: clean.phaseSlice.mode, n: roster[activeId].rows.length })
+    : t('scoutLoaded', { added, total: roster[activeId].rows.length });
+  scoutMsg(sliceMsg);
+  state.coachSlice = clean.phaseSlice ? (clean.phaseSlice.mode + ':' + clean.phaseSlice.phase) : state.coachSlice;
+  state.view = 'threats';                          // jump to Coach view (internal id 'threats')
   const main = mostPlayed(roster[activeId].rows);
-  if (main && idx[main]) selectChar(main);   // selectChar re-renders
+  if (main && idx[main]) selectChar(main);         // selectChar re-renders the (now Coach) view
   else render();
 }
 
@@ -937,6 +1010,7 @@ function importRosterFile(file) {
       incoming[id] = {
         cfnId: id, name: String(p.name || id), isSelf: !!p.isSelf,
         rows: validRows(p.rows, ROSTER_NAMES()),
+        phaseStats: sanitizePhaseStats(p.phaseStats, ROSTER_NAMES()) || undefined,
         createdAt: Number(p.createdAt) || 0, updatedAt: Number(p.updatedAt) || 0,
       };
       imported++;
@@ -996,6 +1070,7 @@ function scoutInputsHtml(compact) {
         <span class="scout-method-title">${t('scoutBmTitle')}</span>
         <p class="scout-method-hint">${t('scoutBmHint')}</p>
         <a class="scout-bm" id="scout-bm" href="#" draggable="true">⚡ ${t('scoutBmLabel')}</a>
+        <button class="scout-wiz-help" id="scout-wiz-help" aria-label="${t('wizReopen')}">?</button>
       </div>
     </div>
     <div class="scout-method">
@@ -1112,6 +1187,46 @@ function renderTrend() {
     <path class="trend-line" d="${line}" fill="none"/>${dots}${xlabels}</svg></div>`;
 }
 
+function renderImportWizard() {
+  // Remove any existing wizard before inserting a new one
+  document.getElementById('import-wizard')?.remove();
+  const el = document.createElement('div');
+  el.id = 'import-wizard';
+  el.className = 'import-wizard';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'wiz-title');
+  el.innerHTML = `<div class="import-wizard-card">
+    <div class="import-wizard-head">
+      <span id="wiz-title" class="import-wizard-title">${t('wizTitle')}</span>
+      <button class="import-wizard-close" aria-label="${t('wizDone')}">×</button>
+    </div>
+    <ol class="import-wizard-steps">
+      <li>${t('wizStep1')}</li>
+      <li>${t('wizStep2')}</li>
+      <li>${t('wizStep3')}</li>
+      <li>${t('wizStep4')}</li>
+    </ol>
+    <button class="import-wizard-done">${t('wizDone')}</button>
+  </div>`;
+  document.body.appendChild(el);
+
+  function close() {
+    el.remove();
+    document.removeEventListener('keydown', onKey);
+    state.wizardSeen = true;
+    setMeta('wizardSeen', true).catch(() => {});
+  }
+
+  el.querySelector('.import-wizard-close').addEventListener('click', close);
+  el.querySelector('.import-wizard-done').addEventListener('click', close);
+  // Clicking the backdrop (outside the card) also closes
+  el.addEventListener('click', e => { if (e.target === el) close(); });
+  // Escape key — listener removed in close() so every close path cleans up
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('keydown', onKey);
+}
+
 function renderScout() {
   $('#reliab-legend').hidden = true;
   $('#hero-summary').innerHTML = '';
@@ -1120,6 +1235,8 @@ function renderScout() {
     $('#caption').innerHTML = t('scoutIntro');
     $('#lanes').innerHTML = scoutStatusHtml() + scoutInputsHtml(false);
     wireScoutInputs();
+    // Show wizard on first visit (no profiles yet and not previously dismissed)
+    if (!state.wizardSeen && rosterList().length === 0) renderImportWizard();
     return;
   }
 
@@ -1183,7 +1300,7 @@ function renderScout() {
   });
   $('#scout-dl')?.addEventListener('click', downloadScoutCsv);
   $('#scout-clear')?.addEventListener('click', clearScoutData);
-  $('#sc-profile')?.addEventListener('change', e => { state.activeProfileId = e.target.value; const m = mostPlayed(activeRows()); if (m && idx[m]) selectChar(m); else render(); });
+  $('#sc-profile')?.addEventListener('change', e => { state.activeProfileId = e.target.value; state.coachSlice = null; const m = mostPlayed(activeRows()); if (m && idx[m]) selectChar(m); else render(); });
   $('#rm-export')?.addEventListener('click', exportRoster);
   $('#rm-import-file')?.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) importRosterFile(f); });
   document.querySelectorAll('#lanes .rm-row').forEach(rowEl => {
@@ -1203,11 +1320,14 @@ function wireScoutInputs() {
     bm.href = scoutBookmarklet({
       noProfile: t('bmNoProfile'), progress: t('bmProgress'), noMatches: t('bmNoMatches'),
       done: t('bmDone'), copy: t('bmCopy'), copied: t('bmCopied'), close: t('bmClose'), failed: t('bmFailed'),
+      bmPickPhase: t('bmPickPhase'), bmPull: t('bmPull'), bmCancel: t('bmCancel'),
+      bmStatsProgress: t('bmStatsProgress'), bmStatsChar: t('bmStatsChar'), bmStatsRival: t('bmStatsRival'),
     });
     // clicking it here would run in our origin (CORS-blocked) — it's meant to be
     // dragged to the bookmarks bar and clicked on the Buckler site instead.
     bm.addEventListener('click', e => { e.preventDefault(); scoutMsg(t('scoutBmDrag')); render(); });
   }
+  $('#scout-wiz-help')?.addEventListener('click', () => renderImportWizard());
   $('#scout-paste-go')?.addEventListener('click', () => ingestPayloadText($('#scout-paste')?.value));
   $('#scout-file')?.addEventListener('change', e => {
     const f = e.target.files?.[0]; if (f) ingestCsvFile(f);

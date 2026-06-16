@@ -109,6 +109,7 @@ const DELTA = 0.03;       // min material gap vs baseline (3 percentage points)
 const MIN_TRUST = 10;     // games below which a deviation is "small sample"
 const WEAK_PROB = 0.85;   // P(true < baseline) needed to call a real weakness
 const STRONG_PROB = 0.15; // symmetric threshold for overperforming
+const PHASE_CAP = 40;     // max phase pseudo-games entering the prior (≈2× KAPPA)
 
 // Classify one matchup given baseline win-rate p0 (0..1) and your wins/losses.
 // Returns {shrunk, lo, hi, probBelow, n, verdict, deficit}.
@@ -117,7 +118,12 @@ function classify(p0, wins, losses, opts = {}) {
   const level = opts.level ?? CRED_LEVEL;
   const delta = opts.delta ?? DELTA;
   const minTrust = opts.minTrust ?? MIN_TRUST;
-  const [a, b] = betaPosterior(p0, kappa, wins, losses);
+  let [a, b] = betaPosterior(p0, kappa, wins, losses);
+  const ph = opts.phase;
+  if (ph && ph.alpha > 0 && ph.n > 0 && Number.isFinite(ph.p)) {
+    const m = Math.min(ph.n, PHASE_CAP) * ph.alpha;
+    a += m * ph.p; b += m * (1 - ph.p);
+  }
   const mean = posteriorMean(a, b);
   const [lo, hi] = credibleInterval(a, b, level);
   const pb = probBelow(a, b, p0);
@@ -163,22 +169,51 @@ function safeId(id) {
   return (s === '__proto__' || s === 'constructor' || s === 'prototype') ? null : s;
 }
 
-// route a parsed pull ({owner,name,isSelf,rows}) into the roster: create a new profile
-// or merge-dedupe into the existing one by CFN id. Returns {roster, activeId} (immutable;
-// activeId null if the owner is an unsafe key). A pull never clobbers a manual rename — it
-// only fills in the fighter name while the profile still has its default (id) name; isSelf
-// only ever flips on.
+// Convert a v1 flat phaseStats {seasonId, perChar, perMatchup} (Mode:All) to the v2 keyed
+// {defaultSlice, slices} form. Already-v2 objects (have .slices) pass through. Null -> null.
+function migratePhaseStats(ps) {
+  if (!ps || typeof ps !== 'object') return ps;
+  if (ps.slices) return ps;                                    // already v2
+  if (!('perChar' in ps) && !('perMatchup' in ps)) return ps;  // unknown shape, leave as-is
+  const phase = Number.isFinite(ps.seasonId) ? ps.seasonId : null;
+  const key = 'all:' + phase;
+  return { defaultSlice: key, slices: { [key]: { mode: 'all', phase, perChar: ps.perChar || {}, perMatchup: ps.perMatchup || {}, capturedAt: 0 } } };
+}
+
+// route a parsed pull ({owner,name,isSelf,rows[,phaseSlice]}) into the roster: create a new
+// profile or merge-dedupe into the existing one by CFN id. Returns {roster, activeId}
+// (immutable; activeId null if the owner is an unsafe key). A pull never clobbers a manual
+// rename — it only fills in the fighter name while the profile still has its default (id)
+// name; isSelf only ever flips on. phaseSlice (if present) is accumulated into keyed slices
+// under phaseStats; absent from payload -> prior slices preserved; no prior -> key absent.
 function routePull(roster, payload, now) {
   const id = safeId(payload.owner);
   if (id == null) return { roster, activeId: null };
   const ex = roster[id];
-  const profile = ex
+  const base = ex
     ? { ...ex, rows: mergeRows(ex.rows, payload.rows),
         name: (ex.name && ex.name !== ex.cfnId) ? ex.name : (payload.name || ex.name),
         isSelf: ex.isSelf || !!payload.isSelf,
         updatedAt: now }
     : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
+  let phaseStats = ex ? migratePhaseStats(ex.phaseStats) : undefined;
+  const slice = payload.phaseSlice;
+  if (slice && slice.phase != null) {
+    const key = slice.mode + ':' + slice.phase;
+    const prior = phaseStats && phaseStats.slices ? phaseStats.slices : {};
+    phaseStats = { defaultSlice: key, slices: { ...prior, [key]: { ...slice, capturedAt: now } } };
+  }
+  const profile = phaseStats !== undefined ? { ...base, phaseStats } : base;
   return { roster: { ...roster, [id]: profile }, activeId: id };
+}
+
+// Merge two (possibly v1-flat) phaseStats by union of slices; incoming wins on key clash
+// and sets the default. Either side may be undefined.
+function mergePhaseStats(a, b) {
+  const A = migratePhaseStats(a), B = migratePhaseStats(b);
+  if (!A) return B; if (!B) return A;
+  const slices = { ...A.slices, ...B.slices };
+  return { defaultSlice: B.defaultSlice || A.defaultSlice, slices };
 }
 
 // merge an imported roster into a base roster: per-profile dedupe by replay_id; the
@@ -193,7 +228,8 @@ function mergeRosters(base, incoming) {
       ? { ...cur, rows: mergeRows(cur.rows, inc.rows),
           name: incU > curU ? inc.name : cur.name,
           isSelf: cur.isSelf || inc.isSelf,
-          updatedAt: Math.max(curU, incU) }
+          updatedAt: Math.max(curU, incU),
+          phaseStats: mergePhaseStats(cur.phaseStats, inc.phaseStats) }
       : { ...inc, updatedAt: incU };
   }
   return out;
@@ -279,15 +315,89 @@ function skillMatchedAgg(rows, char, opts = {}) {
   return wl;
 }
 
+const MR_GAP_UNIT = 100;       // MR per logistic unit
+const MR_MIN_SAMPLE = 15;      // below this many MR-bearing games, use the fallback slope
+const MR_FALLBACK_BETA = 0.4;  // conservative default win-prob slope per 100-MR gap
+const MR_MAX_BETA = 3.0;       // clamp the fitted slope; beyond ±3 (≈sigmoid 0.95/100-MR) a separable fit overcorrects
+
+const _clampP = p => Math.min(1 - 1e-6, Math.max(1e-6, p));
+const _logit = p => { const q = _clampP(p); return Math.log(q / (1 - q)); };
+const _sigmoid = x => 1 / (1 + Math.exp(-x));
+
+// [gap, win] pairs over MR-bearing games as `char` (both MRs present and finite).
+function _mrPairs(rows, char) {
+  const out = [];
+  for (const r of rows) {
+    if (r.your_char !== char) continue;
+    const a = Number(r.rank_mr), b = Number(r.opp_mr);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || r.rank_mr === '' || r.opp_mr === '') continue;
+    out.push([(a - b) / MR_GAP_UNIT, r.result === 'W' ? 1 : 0]);
+  }
+  return out;
+}
+
+// Fit win ~ sigmoid(b0 + beta*gap) by Newton's method over MR-bearing games; fall back to a
+// fixed conservative slope when the sample is too thin. Returns {beta, fallback, n}.
+function mrSlope(rows, char) {
+  const pts = _mrPairs(rows, char);
+  if (pts.length < MR_MIN_SAMPLE) return { beta: MR_FALLBACK_BETA, fallback: true, n: pts.length };
+  let b0 = 0, b1 = 0;
+  for (let it = 0; it < 25; it++) {
+    let g0 = 0, g1 = 0, h00 = 1e-6, h01 = 0, h11 = 1e-6;
+    for (const [x, y] of pts) {
+      const mu = _sigmoid(b0 + b1 * x), w = Math.max(1e-6, mu * (1 - mu));
+      g0 += (mu - y); g1 += (mu - y) * x; h00 += w; h01 += w * x; h11 += w * x * x;
+    }
+    const det = h00 * h11 - h01 * h01;
+    if (Math.abs(det) < 1e-12) break;
+    b0 -= (h11 * g0 - h01 * g1) / det;
+    b1 -= (-h01 * g0 + h00 * g1) / det;
+  }
+  return { beta: Math.max(-MR_MAX_BETA, Math.min(MR_MAX_BETA, b1)), fallback: false, n: pts.length };
+}
+
+// {opp: mean (yourMR - oppMR)/100} over MR-bearing games as `char`.
+function matchupGaps(rows, char) {
+  const sum = {}, cnt = {};
+  for (const r of rows) {
+    if (r.your_char !== char) continue;
+    const a = Number(r.rank_mr), b = Number(r.opp_mr);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || r.rank_mr === '' || r.opp_mr === '') continue;
+    sum[r.opp_char] = (sum[r.opp_char] || 0) + (a - b) / MR_GAP_UNIT;
+    cnt[r.opp_char] = (cnt[r.opp_char] || 0) + 1;
+  }
+  const out = {};
+  for (const opp of Object.keys(sum)) out[opp] = sum[opp] / cnt[opp];
+  return out;
+}
+
+// Re-rate an MR-blind phase win-rate to an even-strength (gap 0) reference. No-op when
+// gap or beta is zero.
+function applyMrBridge(p, gap, beta) {
+  if (!gap || !beta) return p;
+  return _sigmoid(_logit(p) - beta * gap);
+}
+
 // Join the weighted personal record (agg) to the global baseline ({opp: 0..1}) and classify
 // each matchup. Splits the gap into personalGap (you below the field) and universalHardness
-// (the matchup is hard for everyone — already encoded in the baseline).
-function diagnoseFromBaseline(baseline, agg) {
+// (the matchup is hard for everyone — already encoded in the baseline). Optional opts:
+// opts: alpha 0..1 blend weight; phase {opp:[win,battle]}; gaps {opp:meanMrGap}; mrBeta logistic slope per 100-MR.
+function diagnoseFromBaseline(baseline, agg, opts = {}) {
+  const phase = opts.phase || {};
+  const gaps = opts.gaps || {};
+  const alpha = opts.alpha ?? 0;
+  const beta = opts.mrBeta ?? 0;
   const out = [];
   for (const opp of Object.keys(baseline)) {
     const p0 = baseline[opp];
     const [w, l] = agg[opp] || [0, 0];
-    const c = classify(p0, w, l);
+    let phaseOpt;
+    const pp = phase[opp];
+    if (pp && pp[1] > 0 && alpha > 0) {
+      const rate = applyMrBridge(pp[0] / pp[1], gaps[opp] ?? 0, beta);
+      phaseOpt = { p: rate, n: pp[1], alpha };
+    }
+    const c = classify(p0, w, l, phaseOpt ? { phase: phaseOpt } : {});
     out.push({
       opp, baseline: p0, shrunk: c.shrunk, lo: c.lo, hi: c.hi,
       probBelow: c.probBelow, n: c.n, deficit: c.deficit, verdict: c.verdict,
@@ -367,22 +477,116 @@ function parseBattlelog(nextData, myShortId, names) {
 }
 
 // Accept a full __NEXT_DATA__ dict or the compact {owner,name,isSelf,replays} blob and
-// return {owner, name, isSelf, rows}. Older {owner,replays} blobs still parse.
+// return {owner, name, isSelf, rows, phaseSlice}. Older {owner,replays} blobs still parse.
 function parsePayload(payload, names) {
+  const phaseSlice = parsePhaseSlice(payload.phaseSlice ?? null, names);
   if (payload?.props?.pageProps?.replay_list) {
     const pp = payload.props.pageProps;
     const owner = pp.fighter_banner_info?.personal_info?.short_id;
     const name = pp.fighter_banner_info?.personal_info?.fighter_id || String(owner);
     const isSelf = pp.common?.loginUser?.shortId != null
       && Number(pp.common.loginUser.shortId) === Number(owner);
-    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names) };
+    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names), phaseSlice };
   }
   if (payload?.owner != null && Array.isArray(payload.replays)) {
     const nd = { props: { pageProps: { replay_list: payload.replays } } };
     return { owner: payload.owner, name: payload.name || String(payload.owner),
-             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names) };
+             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names), phaseSlice };
   }
   throw new Error('unrecognized battlelog payload');
+}
+
+// Coerce a count to a non-negative finite integer; rejects NaN/Infinity/-Infinity/strings
+// like "Infinity" (which Number() would pass through) -> 0. Shared by the phase-stats parsers.
+function _cntInt(v) {
+  const n = Math.trunc(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// Map raw Buckler win-rate arrays -> {perChar, perMatchup} of official-name keys with
+// non-negative-int counts clamped win<=battle; drops ANY (id 0), unknown chars, zero-battle.
+function _mapWinRates(characterWinRates, rivalWinRates, names) {
+  const map = buildOfficialMap(names);
+  const known = new Set(Object.values(map));
+  const nm = a => { const o = officialName(a, map); return known.has(o) ? o : null; };
+  const pair = (win, battle) => { const b = _cntInt(battle); return [Math.min(_cntInt(win), b), b]; };
+  const perChar = {};
+  const cwr = Array.isArray(characterWinRates) ? characterWinRates : [];
+  for (const c of cwr) {
+    if (!c || typeof c !== 'object' || c.character_id === 0) continue;
+    const name = nm(c.character_alpha);
+    const [w, b] = pair(c.win_count, c.battle_count);
+    if (!name || b === 0) continue;
+    perChar[name] = [w, b];
+  }
+  const byId = {};
+  for (const c of cwr) { if (c && typeof c === 'object') byId[c.character_id] = c.character_alpha; }
+  const perMatchup = {};
+  for (const rec of (Array.isArray(rivalWinRates) ? rivalWinRates : [])) {
+    if (!rec || typeof rec !== 'object' || rec.character_id === 0) continue;
+    const alpha = byId[rec.character_id];
+    if (alpha === undefined) continue;
+    const name = nm(alpha);
+    if (!name) continue;
+    const mm = {};
+    for (const m of rec.rival_character_win_rates || []) {
+      if (m.rival_character_id === 0) continue;
+      const opp = nm(m.rival_character_alpha);
+      const [w, b] = pair(m.win_count, m.battle_count);
+      if (!opp || b === 0) continue;
+      mm[opp] = [w, b];
+    }
+    if (Object.keys(mm).length) perMatchup[name] = mm;
+  }
+  return { perChar, perMatchup };
+}
+
+// Parse one raw bookmarklet slice {mode, phase, characterWinRates, rivalWinRates} into a
+// validated {mode, phase, perChar, perMatchup}. Returns null if absent.
+function parsePhaseSlice(rawSlice, names) {
+  if (!rawSlice || typeof rawSlice !== 'object') return null;
+  const { perChar, perMatchup } = _mapWinRates(rawSlice.characterWinRates, rawSlice.rivalWinRates, names);
+  if (!Object.keys(perChar).length && !Object.keys(perMatchup).length) return null;
+  const phase = Number.isFinite(Number(rawSlice.phase)) ? Number(rawSlice.phase) : null;
+  const mode = typeof rawSlice.mode === 'string' ? rawSlice.mode : 'ranked';
+  return { mode, phase, perChar, perMatchup };
+}
+
+// Re-validate an untrusted (imported) phaseStats: migrate v1 flat -> v2, then for each slice
+// keep only roster-known char/rival keys, _cntInt-coerce + clamp win<=battle, drop zero-battle
+// and empty slices. Returns null if nothing valid remains.
+function sanitizePhaseStats(ps, names) {
+  if (!ps || typeof ps !== 'object') return null;
+  const v2 = migratePhaseStats(ps);
+  if (!v2 || !v2.slices) return null;
+  const known = new Set(Object.values(buildOfficialMap(names)));
+  const pair = (w, b0) => { const b = _cntInt(b0); return [Math.min(_cntInt(w), b), b]; };
+  const cleanMap = (obj, nested) => {
+    const out = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (!known.has(k)) continue;
+      if (nested) {
+        if (!v || typeof v !== 'object') continue;
+        const inner = {};
+        for (const [o, vv] of Object.entries(v)) { if (known.has(o) && Array.isArray(vv)) { const p = pair(vv[0], vv[1]); if (p[1] > 0) inner[o] = p; } }
+        if (Object.keys(inner).length) out[k] = inner;
+      } else if (Array.isArray(v)) { const p = pair(v[0], v[1]); if (p[1] > 0) out[k] = p; }
+    }
+    return out;
+  };
+  const slices = {};
+  for (const [key, sl] of Object.entries(v2.slices)) {
+    if (!sl || typeof sl !== 'object') continue;
+    const perChar = cleanMap(sl.perChar, false);
+    const perMatchup = cleanMap(sl.perMatchup, true);
+    if (!Object.keys(perChar).length && !Object.keys(perMatchup).length) continue;
+    slices[key] = { mode: typeof sl.mode === 'string' ? sl.mode : 'ranked',
+                    phase: Number.isFinite(Number(sl.phase)) ? Number(sl.phase) : null,
+                    perChar, perMatchup, capturedAt: _cntInt(sl.capturedAt) };
+  }
+  if (!Object.keys(slices).length) return null;
+  const defaultSlice = slices[v2.defaultSlice] ? v2.defaultSlice : Object.keys(slices)[0];
+  return { defaultSlice, slices };
 }
 
 /* ---------- personal CSV round-trip (mirror fetch_battlelog CSV_FIELDS) ---------- */
@@ -457,12 +661,13 @@ if (typeof module !== 'undefined') {
   module.exports = {
     lgamma, regIncompleteBeta, betaPosterior, posteriorMean, betaPpf,
     credibleInterval, probBelow,
-    KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB,
+    KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB, PHASE_CAP,
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
-    monthOf, newProfile, routePull, mergeRosters, safeId,
-    buildOfficialMap, officialName, parseBattlelog, parsePayload,
+    mrSlope, matchupGaps, applyMrBridge,
+    monthOf, newProfile, migratePhaseStats, mergePhaseStats, routePull, mergeRosters, safeId,
+    buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseSlice, _mapWinRates, sanitizePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
 }
