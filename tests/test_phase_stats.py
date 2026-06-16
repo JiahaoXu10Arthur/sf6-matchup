@@ -139,10 +139,10 @@ def test_diagnose_no_opts_unchanged():
     assert a == b
 
 def test_diagnose_phase_sharpens_shrunk():
-    no    = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [3, 0]}})
-    withp = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [3, 0]},
+    no_phase = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [3, 0]}})
+    withp    = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [3, 0]},
                 'opts': {'alpha': 0.7, 'phase': {'KEN': [40, 200]}}})   # 20% phase rate, big n
-    assert withp[0]['shrunk'] < no[0]['shrunk']
+    assert withp[0]['shrunk'] < no_phase[0]['shrunk']
 
 def test_diagnose_phase_absent_opponent_is_plain_classify():
     # opponent present in baseline but NOT in phase -> no phase term, same as plain
@@ -150,3 +150,18 @@ def test_diagnose_phase_absent_opponent_is_plain_classify():
     withp = run('diagnoseFromBaseline', {'baseline': {'RYU': 0.50}, 'agg': {'RYU': [1, 1]},
                 'opts': {'alpha': 0.7, 'phase': {'KEN': [40, 200]}}})   # phase has KEN, not RYU
     assert plain[0]['shrunk'] == withp[0]['shrunk']
+
+def test_diagnose_phase_mr_bridge_adjusts_shrunk():
+    # gap < 0 means opponents were stronger on average -> raw phase rate understates skill,
+    # so the bridge raises the rate -> shrunk should be higher than with no gap (bridge no-op).
+    no_bridge = run('diagnoseFromBaseline', {
+        'baseline': {'KEN': 0.50}, 'agg': {'KEN': [0, 0]},
+        'opts': {'alpha': 0.7, 'phase': {'KEN': [40, 200]},
+                 'gaps': {'KEN': 0.0}, 'mrBeta': 0.4}
+    })
+    with_gap = run('diagnoseFromBaseline', {
+        'baseline': {'KEN': 0.50}, 'agg': {'KEN': [0, 0]},
+        'opts': {'alpha': 0.7, 'phase': {'KEN': [40, 200]},
+                 'gaps': {'KEN': -2.0}, 'mrBeta': 0.4}  # stronger opponents -> bridged rate rises
+    })
+    assert with_gap[0]['shrunk'] > no_bridge[0]['shrunk']

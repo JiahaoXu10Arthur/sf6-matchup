@@ -357,6 +357,7 @@ function applyMrBridge(p, gap, beta) {
 // each matchup. Splits the gap into personalGap (you below the field) and universalHardness
 // (the matchup is hard for everyone — already encoded in the baseline). Optional opts:
 // opts.phase = {opp:[win,battle]}, opts.alpha, opts.gaps = {opp:gap}, opts.mrBeta.
+// opts: alpha 0..1 blend weight; phase {opp:[win,battle]}; gaps {opp:meanMrGap}; mrBeta logistic slope per 100-MR.
 function diagnoseFromBaseline(baseline, agg, opts = {}) {
   const phase = opts.phase || {};
   const gaps = opts.gaps || {};
