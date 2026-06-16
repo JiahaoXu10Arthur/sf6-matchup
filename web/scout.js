@@ -453,7 +453,7 @@ function parseBattlelog(nextData, myShortId, names) {
 }
 
 // Accept a full __NEXT_DATA__ dict or the compact {owner,name,isSelf,replays} blob and
-// return {owner, name, isSelf, rows, phaseStats}. Older {owner,replays} blobs still parse.
+// return {owner, name, isSelf, rows, phaseSlice}. Older {owner,replays} blobs still parse.
 function parsePayload(payload, names) {
   const phaseSlice = parsePhaseSlice(payload.phaseSlice ?? null, names);
   if (payload?.props?.pageProps?.replay_list) {
@@ -522,6 +522,7 @@ function _mapWinRates(characterWinRates, rivalWinRates, names) {
 function parsePhaseSlice(rawSlice, names) {
   if (!rawSlice || typeof rawSlice !== 'object') return null;
   const { perChar, perMatchup } = _mapWinRates(rawSlice.characterWinRates, rawSlice.rivalWinRates, names);
+  if (!Object.keys(perChar).length && !Object.keys(perMatchup).length) return null;
   const phase = Number.isFinite(Number(rawSlice.phase)) ? Number(rawSlice.phase) : null;
   const mode = typeof rawSlice.mode === 'string' ? rawSlice.mode : 'ranked';
   return { mode, phase, perChar, perMatchup };

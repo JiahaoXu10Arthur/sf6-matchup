@@ -265,5 +265,5 @@ def test_parse_slice_rejects_infinity():
     raw = {'mode': 'ranked', 'phase': 5,
            'characterWinRates': [{'character_id': 27, 'character_alpha': 'TERRY', 'win_count': 'Infinity', 'battle_count': 'Infinity'}],
            'rivalWinRates': []}
-    sl = run('parsePhaseSlice', {'rawSlice': raw, 'names': NAMES2})
-    assert sl['perChar'] == {}
+    # all entries dropped (Infinity -> 0 -> zero-battle) -> nothing valid -> null slice (not stored)
+    assert run('parsePhaseSlice', {'rawSlice': raw, 'names': NAMES2}) is None
