@@ -847,7 +847,13 @@ await new Promise(z=>setTimeout(z,500));
 }
 pill.remove();
 if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
-var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays});
+var phaseRaw=null;try{
+var phtml=await fetch('https://www.streetfighter.com/6/buckler/profile/'+owner+'/play',{credentials:'include'}).then(x=>x.text());
+var pdoc=new DOMParser().parseFromString(phtml,'text/html');
+var pel=pdoc.getElementById('__NEXT_DATA__');
+if(pel){phaseRaw=JSON.parse(pel.textContent).props.pageProps.play||null;}
+}catch(e){phaseRaw=null;}
+var blob=JSON.stringify({owner:owner,name:pname,isSelf:lu!=null&&String(lu)===String(owner),replays:replays,phaseRaw:phaseRaw});
 var ov=document.createElement('div');
 ov.style.cssText='position:fixed;inset:0;z-index:2147483647;background:rgba(5,8,15,.78);display:flex;align-items:center;justify-content:center';
 var card=document.createElement('div');
