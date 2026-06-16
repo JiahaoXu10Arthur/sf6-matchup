@@ -36,7 +36,7 @@ One app, six view tabs over the same data and logic, at
 | **Bars** | Dark "training-mode" diverging-bar table |
 | **Sub Recommend** | Best secondary characters to cover your worst matchups |
 | **Usage × Win** | Smogon-style cast-wide usage vs win-rate scatter (point size = polarization) |
-| **Matchup map** | Per-character scatter — each opponent plotted by encounter frequency vs your win rate; lower-right (common · losing) is the practice priority |
+| **Coach** | Ranked "what to work on next" — your matchups scored by frequency × how far below the skill-matched baseline you are × confidence, tagged personal-gap vs universally-hard, each with a pocket-pick alternative |
 
 Clicking any character (chip, bar, or point) opens a detail card — win rate, usage,
 and its strongest/weakest matchups — with a button to jump to that character's page.
@@ -72,9 +72,12 @@ Prebuilt offline files are attached to each
   prioritises covering characters you actually meet. The play-rate is a **tier- and
   month-weighted blend** over the rank×month grid (the same weights as the matchup scores),
   so it follows whatever rank/month focus you set; per-opponent overrides are available.
-- **Two scatter views** — a cast-wide **Usage × Win** meta map (popularity vs win rate,
-  over/under-rated quadrants) and a per-character **Matchup map** (each opponent by encounter
-  frequency vs your win rate) that surfaces the common, losing matchups worth drilling.
+- **Usage × Win meta map** — a cast-wide scatter of popularity vs win rate with
+  over/under-rated quadrants.
+- **Coach** — your loaded matchups ranked by what's worth practicing next: frequency ×
+  how far below the skill-matched baseline you are (your record weighted toward opponents
+  near your MR) × confidence, tagged personal-gap vs universally-hard, each with a
+  pocket-pick alternative.
 - **Character detail card** — click any character anywhere to see its win rate, usage, and
   best/worst matchups, with a one-click jump to its own page.
 - **Bilingual UI** — English and Simplified Chinese, with auto-detection and a manual toggle.
@@ -250,7 +253,7 @@ needed only for the CLI fetch step.
 
 ```bash
 python3 -m http.server 8741        # from the repository root
-# App: http://localhost:8741/web/   (Matchups · Bars · Sub Recommend · Usage × Win · Matchup map · Scout)
+# App: http://localhost:8741/web/   (Matchups · Bars · Sub Recommend · Usage × Win · Coach · Scout · Trend)
 ```
 
 The app recalculates instantly in the browser from `output/matrix.csv`:
@@ -261,14 +264,21 @@ tabs — including the in-browser **Scout** (see above). The scoring math in
 `scripts/scoring.py` and `scripts/bayes.py`/`personal_scout.py`; `tests/test_js_parity.py`
 and `tests/test_scout_parity.py` assert the implementations agree to `1e-9`.
 
-With a battlelog loaded in the Scout tab, the **Personal mode** toggle reads the
-Matchup map, Sub Recommend, and Tiers/Bars through your own ladder. Each matchup is
+With a battlelog loaded in the Scout tab, the **Personal mode** toggle reads
+Sub Recommend and Tiers/Bars through your own ladder. Each matchup is
 your record shrunk toward the global baseline (Beta-Binomial, ~20 pseudo-games), so
 it falls back to global exactly where you have no games — and "off" leaves every view
-identical to the global default. The Matchup map plots your encounters × your shrunk
-win-rate; Sub Recommend ranks pockets against the matchups you actually lose; Tiers
-and Bars annotate your W–L and over/under-perform delta; and the Scout table names
-your best pocket per losing matchup. Personal data stays in the browser.
+identical to the global default. Sub Recommend ranks pockets against the matchups you
+actually lose; Tiers and Bars annotate your W–L and over/under-perform delta; the Scout
+table names your best pocket per losing matchup; and the **Coach** view ranks every
+matchup by what's worth practicing next. Personal data stays in the browser.
+
+The Scout keeps a **roster** of players — yourself and others — keyed by CFN id with
+editable names. Each profile **accumulates** its match history across pulls (merge-deduped
+by replay id, persisted in the browser via IndexedDB), so depth grows over time even though
+a single Buckler pull only reaches the last ~100 ranked games. Month- and patch-weighted
+views, a per-matchup pre/post-patch Δ, and a **Trend** chart all read the active profile,
+and you can **export/import** the whole roster as a JSON file you own. Nothing is uploaded.
 
 ## Offline standalone build
 

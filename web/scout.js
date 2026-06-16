@@ -130,14 +130,73 @@ function classify(p0, wins, losses, opts = {}) {
   return { shrunk: mean, lo, hi, probBelow: pb, n, verdict, deficit: (p0 - mean) * pb };
 }
 
-// {opponent: [wins, losses]} for the games you played as `char`.
-function aggregate(rows, char) {
+// {opponent: [wins, losses]} for games played as `char`. When monthW is given, a
+// match counts only if its month (from its `date`) has weight > 0 (whole-game filter,
+// not fractional) — so "current"/"all" profiles apply to the personal record too.
+function aggregate(rows, char, monthW) {
   const wl = {};
   for (const row of rows) {
     if (row.your_char !== char) continue;
+    if (monthW && !(monthW[monthOf(row.date)] > 0)) continue;
     (wl[row.opp_char] ??= [0, 0])[row.result === 'W' ? 0 : 1]++;
   }
   return wl;
+}
+
+// epoch-seconds (string or number) -> 'YYYYMM' in UTC, matching the matrix month keys.
+function monthOf(date) {
+  const d = new Date(Number(date) * 1000);
+  return '' + d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+
+// a fresh profile record
+function newProfile(cfnId, name, isSelf, rows, now) {
+  return { cfnId: String(cfnId), name: name || String(cfnId), isSelf: !!isSelf,
+           rows: rows.slice(), createdAt: now, updatedAt: now };
+}
+
+// reject keys that would pollute an object's prototype (`__proto__`/`constructor`/
+// `prototype`) when used as a roster key. CFN ids are numeric, so legit ids never match.
+// Returns the string id, or null if unsafe.
+function safeId(id) {
+  const s = String(id);
+  return (s === '__proto__' || s === 'constructor' || s === 'prototype') ? null : s;
+}
+
+// route a parsed pull ({owner,name,isSelf,rows}) into the roster: create a new profile
+// or merge-dedupe into the existing one by CFN id. Returns {roster, activeId} (immutable;
+// activeId null if the owner is an unsafe key). A pull never clobbers a manual rename — it
+// only fills in the fighter name while the profile still has its default (id) name; isSelf
+// only ever flips on.
+function routePull(roster, payload, now) {
+  const id = safeId(payload.owner);
+  if (id == null) return { roster, activeId: null };
+  const ex = roster[id];
+  const profile = ex
+    ? { ...ex, rows: mergeRows(ex.rows, payload.rows),
+        name: (ex.name && ex.name !== ex.cfnId) ? ex.name : (payload.name || ex.name),
+        isSelf: ex.isSelf || !!payload.isSelf,
+        updatedAt: now }
+    : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
+  return { roster: { ...roster, [id]: profile }, activeId: id };
+}
+
+// merge an imported roster into a base roster: per-profile dedupe by replay_id; the
+// newer updatedAt wins the name; max updatedAt kept.
+function mergeRosters(base, incoming) {
+  const out = { ...base };
+  for (const id of Object.keys(incoming)) {
+    if (safeId(id) == null) continue;          // never merge under a prototype-polluting key
+    const inc = incoming[id], cur = out[id];
+    const incU = Number(inc.updatedAt) || 0, curU = cur ? (Number(cur.updatedAt) || 0) : 0;
+    out[id] = cur
+      ? { ...cur, rows: mergeRows(cur.rows, inc.rows),
+          name: incU > curU ? inc.name : cur.name,
+          isSelf: cur.isSelf || inc.isSelf,
+          updatedAt: Math.max(curU, incU) }
+      : { ...inc, updatedAt: incU };
+  }
+  return out;
 }
 
 // Your most-played character across the parsed rows (null if none).
@@ -196,6 +255,59 @@ function scout(personalAgg, baseline) {
   return results;
 }
 
+/* ---------- coach: diagnosis + priority (joins personal record to the baseline) ---------- */
+
+// Gaussian MR-proximity weight: a fair match (opponent MR ≈ yours) counts fully; a blowout
+// mismatch is down-weighted toward zero. Unknown/blank MR on either side -> neutral 1.
+const MR_BANDWIDTH = 200;
+function _mrWeight(rankMr, oppMr, band) {
+  const a = Number(rankMr), b = Number(oppMr);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || rankMr === '' || oppMr === '') return 1;
+  return Math.exp(-0.5 * ((Math.abs(a - b) / band) ** 2));
+}
+
+// {opp: [weightedWins, weightedLosses]} for games played as `char`, each game weighted by
+// how skill-matched it was. Weighted counts may be fractional (classify accepts that).
+function skillMatchedAgg(rows, char, opts = {}) {
+  const band = opts.bandwidth ?? MR_BANDWIDTH;
+  const wl = {};
+  for (const row of rows) {
+    if (row.your_char !== char) continue;
+    const w = _mrWeight(row.rank_mr, row.opp_mr, band);
+    (wl[row.opp_char] ??= [0, 0])[row.result === 'W' ? 0 : 1] += w;
+  }
+  return wl;
+}
+
+// Join the weighted personal record (agg) to the global baseline ({opp: 0..1}) and classify
+// each matchup. Splits the gap into personalGap (you below the field) and universalHardness
+// (the matchup is hard for everyone — already encoded in the baseline).
+function diagnoseFromBaseline(baseline, agg) {
+  const out = [];
+  for (const opp of Object.keys(baseline)) {
+    const p0 = baseline[opp];
+    const [w, l] = agg[opp] || [0, 0];
+    const c = classify(p0, w, l);
+    out.push({
+      opp, baseline: p0, shrunk: c.shrunk, lo: c.lo, hi: c.hi,
+      probBelow: c.probBelow, n: c.n, deficit: c.deficit, verdict: c.verdict,
+      personalGap: Math.max(0, p0 - c.shrunk),
+      universalHardness: Math.max(0, 0.5 - p0),
+    });
+  }
+  return out;
+}
+
+// Rank diagnoses by expected return = frequency × personalGap × confidence. classify's
+// deficit already equals (baseline - shrunk) * probBelow, so the score is usage * max(0, deficit)
+// (overperformance never scores). usage: {opp: frequency} (missing -> 1).
+function prioritize(diagnoses, usage) {
+  const u = usage || {};
+  return diagnoses
+    .map(d => ({ ...d, score: (u[d.opp] ?? 1) * Math.max(0, d.deficit) }))
+    .sort((a, b) => b.score - a.score);
+}
+
 /* ---------- battlelog parsing (port of fetch_battlelog.parse_battlelog) ---------- */
 
 // Punctuation/space-insensitive uppercase key (E.Honda / E. HONDA -> EHONDA).
@@ -247,23 +359,28 @@ function parseBattlelog(nextData, myShortId, names) {
       your_char: officialName(me.character_name, officialMap),
       opp_char: officialName(opp.character_name, officialMap),
       rank_mr: String(me.master_rating ?? ''),
+      opp_mr: String(opp.master_rating ?? ''),
       result: myRounds > oppRounds ? 'W' : 'L',
     });
   }
   return out;
 }
 
-// Accept either a full __NEXT_DATA__ dict (single battlelog page) or the compact
-// {owner, replays} blob the bookmarklet produces, and return parsed rows. The
-// owner short_id is read from the page when present, else from the blob.
+// Accept a full __NEXT_DATA__ dict or the compact {owner,name,isSelf,replays} blob and
+// return {owner, name, isSelf, rows}. Older {owner,replays} blobs still parse.
 function parsePayload(payload, names) {
   if (payload?.props?.pageProps?.replay_list) {
-    const owner = payload.props.pageProps.fighter_banner_info?.personal_info?.short_id;
-    return parseBattlelog(payload, owner, names);
+    const pp = payload.props.pageProps;
+    const owner = pp.fighter_banner_info?.personal_info?.short_id;
+    const name = pp.fighter_banner_info?.personal_info?.fighter_id || String(owner);
+    const isSelf = pp.common?.loginUser?.shortId != null
+      && Number(pp.common.loginUser.shortId) === Number(owner);
+    return { owner, name, isSelf, rows: parseBattlelog(payload, owner, names) };
   }
   if (payload?.owner != null && Array.isArray(payload.replays)) {
     const nd = { props: { pageProps: { replay_list: payload.replays } } };
-    return parseBattlelog(nd, payload.owner, names);
+    return { owner: payload.owner, name: payload.name || String(payload.owner),
+             isSelf: !!payload.isSelf, rows: parseBattlelog(nd, payload.owner, names) };
   }
   throw new Error('unrecognized battlelog payload');
 }
@@ -343,6 +460,8 @@ if (typeof module !== 'undefined') {
     KAPPA, CRED_LEVEL, DELTA, MIN_TRUST, WEAK_PROB, STRONG_PROB,
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
+    skillMatchedAgg, diagnoseFromBaseline, prioritize,
+    monthOf, newProfile, routePull, mergeRosters, safeId,
     buildOfficialMap, officialName, parseBattlelog, parsePayload,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };

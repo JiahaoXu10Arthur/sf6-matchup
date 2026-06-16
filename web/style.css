@@ -656,7 +656,7 @@ select:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible
 
 .sc-table { display: flex; flex-direction: column; gap: 2px; }
 .sc-row {
-  display: grid; grid-template-columns: minmax(8rem,1.4fr) 3.4rem 3.4rem minmax(8.5rem,1.3fr) 3.8rem minmax(7rem,1fr) minmax(6rem,1fr);
+  display: grid; grid-template-columns: minmax(8rem,1.4fr) 3.4rem 3.4rem minmax(8.5rem,1.3fr) 3.8rem 3.6rem minmax(7rem,1fr) minmax(6rem,1fr);
   align-items: center; gap: 0.6rem; width: 100%; text-align: left;
   background: var(--surface); border: 1px solid var(--line-soft); border-radius: 7px; padding: 0.5rem 0.7rem;
   font-family: var(--font-mono); font-size: 0.78rem; font-variant-numeric: tabular-nums; color: var(--text);
@@ -683,11 +683,14 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .sc-pocket-go { font-family: var(--font-display); font-size: 0.72rem; font-weight: 600; color: var(--accent); background: rgba(110,139,255,0.1); border: 1px solid rgba(110,139,255,0.35); border-radius: 5px; padding: 0.15rem 0.4rem; cursor: pointer; white-space: nowrap; }
 .sc-pocket-go i { font-style: normal; color: var(--t-adv); }
 .sc-pocket-go:hover { background: rgba(110,139,255,0.2); }
+.sc-dpatch { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
+.sc-dpatch.up { color: var(--t-adv); }
+.sc-dpatch.dn { color: var(--t-dis); }
 
 @media (max-width: 720px) {
   .scout-inputs, .scout-inputs.compact { grid-template-columns: 1fr; }
   .sc-row { grid-template-columns: minmax(6rem,1.3fr) 3rem minmax(6rem,1fr) minmax(6rem,1fr); }
-  .sc-raw, .sc-base, .sc-head .sc-raw, .sc-head .sc-base, .sc-pocket { display: none; }
+  .sc-raw, .sc-base, .sc-dpatch, .sc-head .sc-raw, .sc-head .sc-base, .sc-pocket { display: none; }
   .sc-actions { margin-left: 0; }
 }
 
@@ -700,3 +703,36 @@ button.sc-row:hover { border-color: var(--accent); background: var(--raised); }
 .bars .col-personal { font-family: var(--font-mono); font-size: 0.74rem; text-align: right; color: var(--text-dim); }
 .scout-method-hint a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .scout-method-hint a:hover { color: var(--text); }
+
+/* roster picker + manage panel */
+.sc-profile { font-family: var(--font-display); font-size: 0.8rem; font-weight: 600; background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 0.25rem 0.5rem; }
+.sc-profile-name { font-family: var(--font-display); font-weight: 700; color: var(--text); }
+.roster-manage { margin-top: var(--space-2); border-top: 1px solid var(--line); padding-top: var(--space-2); }
+.rm-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+.rm-actions { display: flex; gap: 0.4rem; }
+.rm-actions button, .rm-import { font-family: var(--font-display); font-size: 0.7rem; color: var(--text-dim); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 0.2rem 0.5rem; cursor: pointer; }
+.rm-actions button:hover, .rm-import:hover { color: var(--text); border-color: var(--accent); }
+.rm-row { display: grid; grid-template-columns: minmax(6rem,1.3fr) 5rem 2.5rem minmax(6rem,1fr) 1.6rem 1.6rem; gap: 0.5rem; align-items: center; padding: 0.3rem 0; font-family: var(--font-mono); font-size: 0.72rem; }
+.rm-name { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 0.2rem 0.4rem; font-family: var(--font-display); font-weight: 600; }
+.rm-id, .rm-count, .rm-span { color: var(--text-dim); }
+.rm-self, .rm-del { background: transparent; border: 1px solid var(--line); border-radius: 5px; color: var(--text-dim); cursor: pointer; }
+.rm-self.on { color: var(--t-adv); border-color: var(--t-adv); }
+.rm-del:hover { color: var(--t-dis); border-color: var(--t-dis); }
+
+/* trend (over-time) line chart — reuses .scatter tick/grid/axis-ref/pt styles */
+.scatter.trend .trend-line { stroke: var(--accent); stroke-width: 2.5; }
+.scatter.trend .pt circle { fill: var(--accent); }
+
+/* coach priority list */
+.coach-list { display: flex; flex-direction: column; gap: 6px; }
+.coach-card { display: grid; grid-template-columns: 2rem minmax(7rem,1.4fr) minmax(8rem,1fr) 4.5rem minmax(8rem,1.2fr) minmax(6rem,1fr); gap: 0.6rem; align-items: center; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 8px; padding: 0.55rem 0.8rem; font-family: var(--font-mono); font-size: 0.8rem; }
+.coach-card.top { border-color: var(--accent); background: var(--raised); }
+.cc-rank { font-family: var(--font-display); font-weight: 800; color: var(--text-dim); }
+.cc-opp { display: flex; align-items: center; gap: 0.45rem; font-family: var(--font-display); font-weight: 600; }
+.cc-rate small { color: var(--text-dim); font-size: 0.7rem; }
+.cc-n { color: var(--text-dim); }
+.cc-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.cc-tag { font-family: var(--font-display); font-size: 0.62rem; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.1rem 0.4rem; border-radius: 4px; border: 1px solid var(--line); color: var(--text-dim); }
+.cc-tag.personal { color: var(--t-dis); border-color: var(--t-dis); }
+.cc-tag.hard { color: var(--text-dim); }
+.cc-tag.small { opacity: 0.7; }
