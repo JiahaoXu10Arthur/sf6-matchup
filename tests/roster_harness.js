@@ -15,5 +15,6 @@ else if (mode === 'skillMatchedAgg') out = s.skillMatchedAgg(arg.rows, arg.char,
 else if (mode === 'diagnoseFromBaseline') out = s.diagnoseFromBaseline(arg.baseline, arg.agg);
 else if (mode === 'prioritize') out = s.prioritize(arg.diagnoses, arg.usage);
 else if (mode === 'classify') out = s.classify(arg.p0, arg.wins, arg.losses, arg.opts || {});
+else if (mode === 'parsePhaseStats') out = s.parsePhaseStats(arg.phaseRaw, arg.names);
 else throw new Error('unknown mode ' + mode);
 console.log(JSON.stringify(out));

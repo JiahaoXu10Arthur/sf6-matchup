@@ -30,3 +30,36 @@ def test_phase_deficit_and_verdict_stay_vs_global_p0():
                              'opts': {'phase': {'p': 0.35, 'n': 100, 'alpha': 0.7}}})
     assert fused['deficit'] > 0                        # measured vs global 0.50, not vs 0.35
     assert fused['shrunk'] < 0.50
+
+PHASE_RAW = {
+    'current_season_id': 12,
+    'character_win_rates': [
+        {'character_id': 0,  'character_alpha': 'ANY',   'win_count': 9,  'battle_count': 18},
+        {'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 264,'battle_count': 516},
+        {'character_id': 1,  'character_alpha': 'RYU',   'win_count': 0,  'battle_count': 0},
+    ],
+    'character_win_rates_by_rival_character': [
+        {'character_id': 32, 'rival_character_win_rates': [
+            {'rival_character_id': 0,  'rival_character_alpha': 'ANY',     'win_count': 264, 'battle_count': 516},
+            {'rival_character_id': 18, 'rival_character_alpha': 'MARISA',  'win_count': 1,   'battle_count': 7},
+            {'rival_character_id': 99, 'rival_character_alpha': 'ZZGLITCH','win_count': 3,   'battle_count': 3},
+            {'rival_character_id': 7,  'rival_character_alpha': 'JURI',    'win_count': 99,  'battle_count': 5},
+        ]},
+    ],
+}
+NAMES = ['TERRY', 'RYU', 'MARISA', 'JURI']
+
+def test_parse_phase_maps_and_drops_any_unknown_zero():
+    ps = run('parsePhaseStats', {'phaseRaw': PHASE_RAW, 'names': NAMES})
+    assert ps['seasonId'] == 12
+    assert ps['perChar'] == {'TERRY': [264, 516]}            # ANY dropped, RYU 0-battle dropped
+    assert ps['perMatchup']['TERRY']['MARISA'] == [1, 7]     # mapped
+    assert 'ZZGLITCH' not in ps['perMatchup']['TERRY']       # unknown dropped
+    assert 'ANY' not in ps['perMatchup']['TERRY']            # aggregate dropped
+
+def test_parse_phase_clamps_win_to_battle():
+    ps = run('parsePhaseStats', {'phaseRaw': PHASE_RAW, 'names': NAMES})
+    assert ps['perMatchup']['TERRY']['JURI'] == [5, 5]       # win_count 99 clamped to battle_count 5
+
+def test_parse_phase_absent_returns_none():
+    assert run('parsePhaseStats', {'phaseRaw': None, 'names': NAMES}) is None

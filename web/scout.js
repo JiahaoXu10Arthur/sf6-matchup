@@ -391,6 +391,43 @@ function parsePayload(payload, names) {
   throw new Error('unrecognized battlelog payload');
 }
 
+// Normalize a Buckler /play `play` blob into {seasonId, perChar, perMatchup}. Maps
+// character_alpha -> official roster name, drops the ANY aggregate (id 0), unknown chars,
+// and zero-battle entries; coerces counts to non-negative ints and clamps win <= battle so
+// downstream win-rates stay in [0,1]. Returns null if absent.
+function parsePhaseStats(phaseRaw, names) {
+  if (!phaseRaw || !Array.isArray(phaseRaw.character_win_rates)) return null;
+  const map = buildOfficialMap(names);
+  const known = new Set(Object.values(map));
+  const cnt = v => Math.max(0, Math.trunc(Number(v) || 0));
+  const nm = a => { const o = officialName(a, map); return known.has(o) ? o : null; };
+  const pair = (win, battle) => { const b = cnt(battle); return [Math.min(cnt(win), b), b]; };
+  const perChar = {};
+  for (const c of phaseRaw.character_win_rates) {
+    if (c.character_id === 0) continue;
+    const name = nm(c.character_alpha); const [w, b] = pair(c.win_count, c.battle_count);
+    if (!name || b === 0) continue;
+    perChar[name] = [w, b];
+  }
+  const byId = {};
+  for (const c of phaseRaw.character_win_rates) byId[c.character_id] = c.character_alpha;
+  const perMatchup = {};
+  for (const rec of phaseRaw.character_win_rates_by_rival_character || []) {
+    if (rec.character_id === 0) continue;
+    const name = nm(byId[rec.character_id]);
+    if (!name) continue;
+    const mm = {};
+    for (const m of rec.rival_character_win_rates || []) {
+      if (m.rival_character_id === 0) continue;
+      const opp = nm(m.rival_character_alpha); const [w, b] = pair(m.win_count, m.battle_count);
+      if (!opp || b === 0) continue;
+      mm[opp] = [w, b];
+    }
+    if (Object.keys(mm).length) perMatchup[name] = mm;
+  }
+  return { seasonId: phaseRaw.current_season_id ?? null, perChar, perMatchup };
+}
+
 /* ---------- personal CSV round-trip (mirror fetch_battlelog CSV_FIELDS) ---------- */
 
 const CSV_FIELDS = ['replay_id', 'date', 'your_char', 'opp_char', 'rank_mr', 'result'];
@@ -468,7 +505,7 @@ if (typeof module !== 'undefined') {
     personalRow, personalEncounter,
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
     monthOf, newProfile, routePull, mergeRosters, safeId,
-    buildOfficialMap, officialName, parseBattlelog, parsePayload,
+    buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
 }
