@@ -751,6 +751,10 @@ function renderScatter() {
 // the drill list; dot size = data confidence (reliability).
 // Coach view: the active profile's matchups ranked by what's worth practicing next —
 // frequency × how far below the skill-matched baseline you are × confidence.
+// Localized label for a slice mode ('ranked' -> 'Ranked'/'排位'); falls back to the raw value.
+const MODE_LABEL_KEY = { ranked: 'modeRanked', all: 'modeAll', casual: 'modeCasual', room: 'modeRoom', hub: 'modeHub' };
+function modeLabel(m) { const k = MODE_LABEL_KEY[m]; return k ? t(k) : String(m); }
+
 function renderCoach() {
   $('#reliab-legend').hidden = true; $('#hero-summary').innerHTML = '';
   const rows = activeRows();
@@ -774,7 +778,7 @@ function renderCoach() {
       .sort((a, b) => (b.capturedAt || 0) - (a.capturedAt || 0))
       .map(sl => {
         const k = sl.mode + ':' + sl.phase;
-        const lbl = t('coachSliceOpt', { p: sl.phase === -1 ? 'Total' : sl.phase, m: escapeHtml(String(sl.mode)) });
+        const lbl = t('coachSliceOpt', { p: sl.phase === -1 ? 'Total' : sl.phase, m: escapeHtml(modeLabel(sl.mode)) });
         return `<option value="${escapeHtml(k)}"${k === sliceKey ? ' selected' : ''}>${lbl}</option>`;
       })
       .join('');
@@ -783,7 +787,7 @@ function renderCoach() {
     const charRateLine = charRec
       ? `<div class="coach-charrate">${t('coachCharRate', { char: escapeHtml(cn(char)), w: Math.round(charRec[0] / charRec[1] * 100), win: charRec[0], n: charRec[1] })}</div>`
       : '';
-    const seasonLine = `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: escapeHtml(String(slice.phase)), m: escapeHtml(String(slice.mode)) })}</div>`;
+    const seasonLine = `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: escapeHtml(String(slice.phase)), m: escapeHtml(modeLabel(slice.mode)) })}</div>`;
     const alphaVal = state.coachAlpha.toFixed(2);
     const offHint = state.coachAlpha === 0 ? ` <span class="coach-blend-off">${t('coachBlendOff')}</span>` : '';
     phaseBlock = `<div class="coach-blend">${sliceSel}${charRateLine}${seasonLine}<label class="coach-blend-label">${t('coachBlend')} <span class="coach-blend-val">${alphaVal}</span>${offHint}<input id="coach-alpha-range" class="coach-blend-range" type="range" min="0" max="1" step="0.05" value="${alphaVal}" aria-label="${t('coachBlend')}"></label></div>`;
@@ -882,9 +886,9 @@ pill.remove();
 if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
 pill.style.display='';pill.textContent=${JSON.stringify(s.bmStatsProgress)};document.body.appendChild(pill);
 var cwr=null,rwr=null;try{
-var rc=await fetch('/6/buckler/api/profile/play/act/characterwinrate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+var rc=await fetch('/6/buckler/api/profile/play/act/characterwinrate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:Number(owner),targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
 cwr=rc.response.character_win_rates;pill.textContent=${JSON.stringify(s.bmStatsChar)};
-var rr=await fetch('/6/buckler/api/profile/play/act/characterwinratebyrivalcharacter',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+var rr=await fetch('/6/buckler/api/profile/play/act/characterwinratebyrivalcharacter',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:Number(owner),targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
 rwr=rr.response.character_win_rates_by_rival_character;pill.textContent=${JSON.stringify(s.bmStatsRival)};
 }catch(e){cwr=null;rwr=null;}
 pill.remove();
@@ -957,7 +961,7 @@ function loadParsedRows(payload) {
   const tgl = $('#personal-toggle'); if (tgl) { tgl.disabled = false; tgl.checked = true; }
   state.personalMode = true;                       // auto-enable Personal mode
   const sliceMsg = (clean.phaseSlice && clean.phaseSlice.phase != null)
-    ? t('scoutLoadedSlice', { p: clean.phaseSlice.phase, m: clean.phaseSlice.mode, n: roster[activeId].rows.length })
+    ? t('scoutLoadedSlice', { p: clean.phaseSlice.phase, m: modeLabel(clean.phaseSlice.mode), n: roster[activeId].rows.length })
     : t('scoutLoaded', { added, total: roster[activeId].rows.length });
   scoutMsg(sliceMsg);
   state.coachSlice = clean.phaseSlice ? (clean.phaseSlice.mode + ':' + clean.phaseSlice.phase) : state.coachSlice;
