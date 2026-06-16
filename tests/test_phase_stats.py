@@ -49,52 +49,35 @@ PHASE_RAW = {
 }
 NAMES = ['TERRY', 'RYU', 'MARISA', 'JURI']
 
-def test_parse_phase_maps_and_drops_any_unknown_zero():
-    ps = run('parsePhaseStats', {'phaseRaw': PHASE_RAW, 'names': NAMES})
-    assert ps['seasonId'] == 12
-    assert ps['perChar'] == {'TERRY': [264, 516]}            # ANY dropped, RYU 0-battle dropped
-    assert ps['perMatchup']['TERRY']['MARISA'] == [1, 7]     # mapped
-    assert 'ZZGLITCH' not in ps['perMatchup']['TERRY']       # unknown dropped
-    assert 'ANY' not in ps['perMatchup']['TERRY']            # aggregate dropped
-
-def test_parse_phase_clamps_win_to_battle():
-    ps = run('parsePhaseStats', {'phaseRaw': PHASE_RAW, 'names': NAMES})
-    assert ps['perMatchup']['TERRY']['JURI'] == [5, 5]       # win_count 99 clamped to battle_count 5
-
-def test_parse_phase_absent_returns_none():
-    assert run('parsePhaseStats', {'phaseRaw': None, 'names': NAMES}) is None
-
 def test_parse_phase_coerces_bad_counts():
-    raw = {
-        'current_season_id': 5,
-        'character_win_rates': [
-            {'character_id': 32, 'character_alpha': 'TERRY', 'win_count': -5, 'battle_count': 10},
+    # parsePhaseSlice: negative win clamped to 0 by _cntInt; None battle -> 0 -> dropped
+    raw_slice = {
+        'mode': 'ranked', 'phase': 5,
+        'characterWinRates': [
+            {'character_id': 27, 'character_alpha': 'TERRY', 'win_count': -5,   'battle_count': 10},
             {'character_id': 1,  'character_alpha': 'RYU',   'win_count': 'abc', 'battle_count': None},
         ],
-        'character_win_rates_by_rival_character': [],
+        'rivalWinRates': [],
     }
-    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY', 'RYU']})
-    assert ps['perChar'] == {'TERRY': [0, 10]}   # -5 -> 0 (clamped non-negative); RYU battle None -> 0 -> dropped
+    sl = run('parsePhaseSlice', {'rawSlice': raw_slice, 'names': ['TERRY', 'RYU']})
+    assert sl['perChar'] == {'TERRY': [0, 10]}   # -5 -> 0; RYU None battle -> 0 -> dropped
 
 def test_parsepayload_includes_phasestats():
-    payload = {'owner': 5, 'name': 'P', 'replays': [], 'phaseRaw': PHASE_RAW}
+    # v2 payload carries phaseSlice (not phaseRaw); parsePayload returns phaseSlice
+    raw_slice = {'mode': 'ranked', 'phase': 12,
+                 'characterWinRates': [{'character_id': 27, 'character_alpha': 'TERRY',
+                                        'win_count': 264, 'battle_count': 516}],
+                 'rivalWinRates': []}
+    payload = {'owner': 5, 'name': 'P', 'replays': [], 'phaseSlice': raw_slice}
     res = run('parsePayload', {'payload': payload, 'names': NAMES})
-    assert res['phaseStats']['perChar'] == {'TERRY': [264, 516]}
+    assert res['phaseSlice']['perChar'] == {'TERRY': [264, 516]}
 
 def test_parsepayload_no_phaseraw_is_none():
+    # payload with no phaseSlice -> phaseSlice field is None
     payload = {'owner': 5, 'name': 'P', 'replays': []}
     res = run('parsePayload', {'payload': payload, 'names': NAMES})
-    assert res['phaseStats'] is None
+    assert res['phaseSlice'] is None
 
-def test_routepull_phase_replaces_and_battlelog_only_preserves():
-    pl1 = {'owner': '5', 'name': 'P', 'rows': [],
-           'phaseStats': {'seasonId': 12, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}
-    r1 = run('routePull', {'roster': {}, 'payload': pl1, 'now': 1})
-    assert r1['roster']['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}
-    # battlelog-only pull (no phaseStats key) must keep the prior snapshot
-    pl2 = {'owner': '5', 'name': 'P', 'rows': []}
-    r2 = run('routePull', {'roster': r1['roster'], 'payload': pl2, 'now': 2})
-    assert r2['roster']['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}
 
 def test_routepull_new_profile_without_phase_has_no_key():
     r = run('routePull', {'roster': {}, 'payload': {'owner': '9', 'name': 'Q', 'rows': []}, 'now': 1})
@@ -166,18 +149,11 @@ def test_diagnose_phase_mr_bridge_adjusts_shrunk():
     })
     assert with_gap[0]['shrunk'] > no_bridge[0]['shrunk']
 
-def test_sanitize_phase_drops_unknown_and_coerces():
-    dirty = {'seasonId': 12,
-             'perChar': {'TERRY': [264, 516], '<img>': [9, 9]},
-             'perMatchup': {'TERRY': {'MARISA': ['1', '7'], 'BADGUY': [2, 2]}}}
-    clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY', 'MARISA']})
-    assert clean['perChar'] == {'TERRY': [264, 516]}          # unknown '<img>' dropped
-    assert clean['perMatchup'] == {'TERRY': {'MARISA': [1, 7]}}  # string counts coerced; BADGUY dropped
-
 def test_sanitize_phase_clamps_and_drops_zero_battle():
+    # v1-flat input migrated to all:5 slice; win 99 clamped to battle 5; MARISA dropped (0 battle)
     dirty = {'seasonId': 5, 'perChar': {'TERRY': [99, 5], 'MARISA': [3, 0]}}
     clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY', 'MARISA']})
-    assert clean['perChar'] == {'TERRY': [5, 5]}   # win 99 clamped to battle 5; MARISA dropped (0 battle)
+    assert clean['slices']['all:5']['perChar'] == {'TERRY': [5, 5]}
 
 def test_sanitize_phase_empty_or_absent_returns_none():
     assert run('sanitizePhaseStats', {'ps': {'perChar': {}, 'perMatchup': {}}, 'names': ['TERRY']}) is None
@@ -190,47 +166,44 @@ def test_sanitize_phase_rejects_infinity_counts():
     assert clean is None     # both battle counts -> 0 -> dropped -> nothing valid -> None
 
 def test_sanitize_phase_drops_proto_key():
+    # v1-flat input (no seasonId -> phase null -> key 'all:null'); __proto__ not a roster name -> dropped
     dirty = {'perChar': {'__proto__': [5, 10], 'TERRY': [3, 4]}}
     clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY']})
-    assert clean['perChar'] == {'TERRY': [3, 4]}   # __proto__ not a roster name -> dropped
-
-def test_parse_phase_rejects_infinity_counts():
-    raw = {'current_season_id': 1,
-           'character_win_rates': [
-               {'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 'Infinity', 'battle_count': 'Infinity'}],
-           'character_win_rates_by_rival_character': []}
-    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
-    assert ps['perChar'] == {}     # Infinity battle -> 0 -> dropped
+    assert clean['slices']['all:null']['perChar'] == {'TERRY': [3, 4]}
+    assert '__proto__' not in clean['slices']['all:null']['perChar']
 
 def test_parse_phase_rejects_nonnumeric_season_id():
-    raw = {'current_season_id': '<img src=x onerror=alert(1)>',
-           'character_win_rates': [{'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 1, 'battle_count': 2}],
-           'character_win_rates_by_rival_character': []}
-    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
-    assert ps['seasonId'] is None                 # non-numeric season id rejected at the parse boundary
-    assert ps['perChar'] == {'TERRY': [1, 2]}     # the rest still parses
-
-def test_parse_phase_keeps_numeric_season_id():
-    raw = {'current_season_id': 12,
-           'character_win_rates': [{'character_id': 32, 'character_alpha': 'TERRY', 'win_count': 1, 'battle_count': 2}],
-           'character_win_rates_by_rival_character': []}
-    ps = run('parsePhaseStats', {'phaseRaw': raw, 'names': ['TERRY']})
-    assert ps['seasonId'] == 12
+    # parsePhaseSlice: non-numeric phase coerces to null (XSS guard)
+    raw_slice = {'mode': 'ranked', 'phase': '<img src=x onerror=alert(1)>',
+                 'characterWinRates': [{'character_id': 27, 'character_alpha': 'TERRY',
+                                        'win_count': 1, 'battle_count': 2}],
+                 'rivalWinRates': []}
+    sl = run('parsePhaseSlice', {'rawSlice': raw_slice, 'names': ['TERRY']})
+    assert sl['phase'] is None                # non-numeric phase rejected
+    assert sl['perChar'] == {'TERRY': [1, 2]} # rest still parses
 
 def test_merge_rosters_carries_imported_phasestats():
+    # v2 phaseStats: same slice key on both sides; incoming wins on clash
     base = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 1,
-                  'phaseStats': {'seasonId': 11, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}}
+                  'phaseStats': {'defaultSlice': 'ranked:12',
+                                 'slices': {'ranked:12': {'mode': 'ranked', 'phase': 12,
+                                                          'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}}}}
     inc  = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 2,
-                  'phaseStats': {'seasonId': 12, 'perChar': {'TERRY': [9, 10]}, 'perMatchup': {}}}}
+                  'phaseStats': {'defaultSlice': 'ranked:12',
+                                 'slices': {'ranked:12': {'mode': 'ranked', 'phase': 12,
+                                                          'perChar': {'TERRY': [9, 10]}, 'perMatchup': {}}}}}}
     out = run('mergeRosters', {'base': base, 'incoming': inc})
-    assert out['5']['phaseStats']['perChar'] == {'TERRY': [9, 10]}   # incoming replaces
+    assert out['5']['phaseStats']['slices']['ranked:12']['perChar'] == {'TERRY': [9, 10]}   # incoming wins
 
 def test_merge_rosters_preserves_phasestats_when_incoming_absent():
+    # incoming profile has no phaseStats; base's slices are preserved
     base = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 1,
-                  'phaseStats': {'seasonId': 11, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}}
-    inc  = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 2}}  # no phaseStats
+                  'phaseStats': {'defaultSlice': 'ranked:12',
+                                 'slices': {'ranked:12': {'mode': 'ranked', 'phase': 12,
+                                                          'perChar': {'TERRY': [1, 2]}, 'perMatchup': {}}}}}}
+    inc  = {'5': {'cfnId': '5', 'name': 'P', 'isSelf': False, 'rows': [], 'updatedAt': 2}}
     out = run('mergeRosters', {'base': base, 'incoming': inc})
-    assert out['5']['phaseStats']['perChar'] == {'TERRY': [1, 2]}    # existing preserved
+    assert out['5']['phaseStats']['slices']['ranked:12']['perChar'] == {'TERRY': [1, 2]}    # base preserved
 
 RAW_SLICE = {
     'mode': 'ranked', 'phase': 12,
