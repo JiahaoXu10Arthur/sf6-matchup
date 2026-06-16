@@ -518,6 +518,37 @@ function parsePhaseStats(phaseRaw, names) {
   return { seasonId: phaseRaw.current_season_id ?? null, perChar, perMatchup };
 }
 
+// Re-validate a stored phaseStats object (untrusted roster import): keep only roster-known
+// char/rival keys, coerce counts to non-negative ints, clamp win <= battle, drop zero-battle
+// entries — the same guarantees parsePhaseStats produces. Returns null if nothing valid remains.
+function sanitizePhaseStats(ps, names) {
+  if (!ps || typeof ps !== 'object') return null;
+  const known = new Set(Object.values(buildOfficialMap(names)));
+  const cnt = v => Math.max(0, Math.trunc(Number(v) || 0));
+  const pair = (w, b0) => { const b = cnt(b0); return [Math.min(cnt(w), b), b]; };
+  const perChar = {};
+  for (const [k, v] of Object.entries(ps.perChar || {})) {
+    if (!known.has(k) || !Array.isArray(v)) continue;
+    const [w, b] = pair(v[0], v[1]);
+    if (b === 0) continue;
+    perChar[k] = [w, b];
+  }
+  const perMatchup = {};
+  for (const [k, mm] of Object.entries(ps.perMatchup || {})) {
+    if (!known.has(k) || !mm || typeof mm !== 'object') continue;
+    const clean = {};
+    for (const [o, v] of Object.entries(mm)) {
+      if (!known.has(o) || !Array.isArray(v)) continue;
+      const [w, b] = pair(v[0], v[1]);
+      if (b === 0) continue;
+      clean[o] = [w, b];
+    }
+    if (Object.keys(clean).length) perMatchup[k] = clean;
+  }
+  if (!Object.keys(perChar).length && !Object.keys(perMatchup).length) return null;
+  return { seasonId: Number.isFinite(ps.seasonId) ? ps.seasonId : null, perChar, perMatchup };
+}
+
 /* ---------- personal CSV round-trip (mirror fetch_battlelog CSV_FIELDS) ---------- */
 
 const CSV_FIELDS = ['replay_id', 'date', 'your_char', 'opp_char', 'rank_mr', 'result'];
@@ -596,7 +627,7 @@ if (typeof module !== 'undefined') {
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
     mrSlope, matchupGaps, applyMrBridge,
     monthOf, newProfile, routePull, mergeRosters, safeId,
-    buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseStats,
+    buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseStats, sanitizePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
 }

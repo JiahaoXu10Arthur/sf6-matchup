@@ -937,6 +937,7 @@ function importRosterFile(file) {
       incoming[id] = {
         cfnId: id, name: String(p.name || id), isSelf: !!p.isSelf,
         rows: validRows(p.rows, ROSTER_NAMES()),
+        phaseStats: sanitizePhaseStats(p.phaseStats, ROSTER_NAMES()) || undefined,
         createdAt: Number(p.createdAt) || 0, updatedAt: Number(p.updatedAt) || 0,
       };
       imported++;

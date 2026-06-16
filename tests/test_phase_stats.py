@@ -165,3 +165,20 @@ def test_diagnose_phase_mr_bridge_adjusts_shrunk():
                  'gaps': {'KEN': -2.0}, 'mrBeta': 0.4}  # stronger opponents -> bridged rate rises
     })
     assert with_gap[0]['shrunk'] > no_bridge[0]['shrunk']
+
+def test_sanitize_phase_drops_unknown_and_coerces():
+    dirty = {'seasonId': 12,
+             'perChar': {'TERRY': [264, 516], '<img>': [9, 9]},
+             'perMatchup': {'TERRY': {'MARISA': ['1', '7'], 'BADGUY': [2, 2]}}}
+    clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY', 'MARISA']})
+    assert clean['perChar'] == {'TERRY': [264, 516]}          # unknown '<img>' dropped
+    assert clean['perMatchup'] == {'TERRY': {'MARISA': [1, 7]}}  # string counts coerced; BADGUY dropped
+
+def test_sanitize_phase_clamps_and_drops_zero_battle():
+    dirty = {'seasonId': 5, 'perChar': {'TERRY': [99, 5], 'MARISA': [3, 0]}}
+    clean = run('sanitizePhaseStats', {'ps': dirty, 'names': ['TERRY', 'MARISA']})
+    assert clean['perChar'] == {'TERRY': [5, 5]}   # win 99 clamped to battle 5; MARISA dropped (0 battle)
+
+def test_sanitize_phase_empty_or_absent_returns_none():
+    assert run('sanitizePhaseStats', {'ps': {'perChar': {}, 'perMatchup': {}}, 'names': ['TERRY']}) is None
+    assert run('sanitizePhaseStats', {'ps': None, 'names': ['TERRY']}) is None
