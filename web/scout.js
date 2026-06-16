@@ -290,6 +290,68 @@ function skillMatchedAgg(rows, char, opts = {}) {
   return wl;
 }
 
+const MR_GAP_UNIT = 100;       // MR per logistic unit
+const MR_MIN_SAMPLE = 15;      // below this many MR-bearing games, use the fallback slope
+const MR_FALLBACK_BETA = 0.4;  // conservative default win-prob slope per 100-MR gap
+
+const _clampP = p => Math.min(1 - 1e-6, Math.max(1e-6, p));
+const _logit = p => { const q = _clampP(p); return Math.log(q / (1 - q)); };
+const _sigmoid = x => 1 / (1 + Math.exp(-x));
+
+// [gap, win] pairs over MR-bearing games as `char` (both MRs present and finite).
+function _mrPairs(rows, char) {
+  const out = [];
+  for (const r of rows) {
+    if (r.your_char !== char) continue;
+    const a = Number(r.rank_mr), b = Number(r.opp_mr);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || r.rank_mr === '' || r.opp_mr === '') continue;
+    out.push([(a - b) / MR_GAP_UNIT, r.result === 'W' ? 1 : 0]);
+  }
+  return out;
+}
+
+// Fit win ~ sigmoid(b0 + beta*gap) by Newton's method over MR-bearing games; fall back to a
+// fixed conservative slope when the sample is too thin. Returns {beta, fallback, n}.
+function mrSlope(rows, char) {
+  const pts = _mrPairs(rows, char);
+  if (pts.length < MR_MIN_SAMPLE) return { beta: MR_FALLBACK_BETA, fallback: true, n: pts.length };
+  let b0 = 0, b1 = 0;
+  for (let it = 0; it < 25; it++) {
+    let g0 = 0, g1 = 0, h00 = 1e-6, h01 = 0, h11 = 1e-6;
+    for (const [x, y] of pts) {
+      const mu = _sigmoid(b0 + b1 * x), w = Math.max(1e-6, mu * (1 - mu));
+      g0 += (mu - y); g1 += (mu - y) * x; h00 += w; h01 += w * x; h11 += w * x * x;
+    }
+    const det = h00 * h11 - h01 * h01;
+    if (Math.abs(det) < 1e-12) break;
+    b0 -= (h11 * g0 - h01 * g1) / det;
+    b1 -= (-h01 * g0 + h00 * g1) / det;
+  }
+  return { beta: b1, fallback: false, n: pts.length };
+}
+
+// {opp: mean (yourMR - oppMR)/100} over MR-bearing games as `char`.
+function matchupGaps(rows, char) {
+  const sum = {}, cnt = {};
+  for (const r of rows) {
+    if (r.your_char !== char) continue;
+    const a = Number(r.rank_mr), b = Number(r.opp_mr);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || r.rank_mr === '' || r.opp_mr === '') continue;
+    sum[r.opp_char] = (sum[r.opp_char] || 0) + (a - b) / MR_GAP_UNIT;
+    cnt[r.opp_char] = (cnt[r.opp_char] || 0) + 1;
+  }
+  const out = {};
+  for (const opp of Object.keys(sum)) out[opp] = sum[opp] / cnt[opp];
+  return out;
+}
+
+// Re-rate an MR-blind phase win-rate to an even-strength (gap 0) reference. No-op when
+// gap or beta is zero.
+function applyMrBridge(p, gap, beta) {
+  if (!gap || !beta) return p;
+  return _sigmoid(_logit(p) - beta * gap);
+}
+
 // Join the weighted personal record (agg) to the global baseline ({opp: 0..1}) and classify
 // each matchup. Splits the gap into personalGap (you below the field) and universalHardness
 // (the matchup is hard for everyone — already encoded in the baseline).
@@ -519,6 +581,7 @@ if (typeof module !== 'undefined') {
     classify, aggregate, mostPlayed, baselineWinrates, scout,
     personalRow, personalEncounter,
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
+    mrSlope, matchupGaps, applyMrBridge,
     monthOf, newProfile, routePull, mergeRosters, safeId,
     buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,

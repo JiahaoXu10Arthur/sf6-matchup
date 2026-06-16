@@ -99,3 +99,24 @@ def test_routepull_phase_replaces_and_battlelog_only_preserves():
 def test_routepull_new_profile_without_phase_has_no_key():
     r = run('routePull', {'roster': {}, 'payload': {'owner': '9', 'name': 'Q', 'rows': []}, 'now': 1})
     assert 'phaseStats' not in r['roster']['9']
+
+def test_apply_mr_bridge_zero_gap_is_noop():
+    assert abs(run('applyMrBridge', {'p': 0.50, 'gap': 0.0, 'beta': 0.4}) - 0.50) < 1e-9
+
+def test_apply_mr_bridge_tougher_schedule_raises_rate():
+    # gap = (you - opp)/100; negative gap = opponents stronger -> normalized rate higher
+    up = run('applyMrBridge', {'p': 0.50, 'gap': -2.0, 'beta': 0.4})
+    assert up > 0.50
+
+def test_mr_slope_falls_back_without_mr():
+    rows = [{'your_char': 'TERRY', 'opp_char': 'KEN', 'result': 'W', 'rank_mr': '', 'opp_mr': ''}]
+    res = run('mrSlope', {'rows': rows, 'char': 'TERRY'})
+    assert res['fallback'] is True
+
+def test_matchup_gaps_mean_per_opponent():
+    rows = [
+        {'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '1500', 'opp_mr': '1700', 'result': 'L'},
+        {'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '1500', 'opp_mr': '1500', 'result': 'W'},
+    ]
+    g = run('matchupGaps', {'rows': rows, 'char': 'TERRY'})
+    assert abs(g['KEN'] - (-1.0)) < 1e-9      # mean gap (-200 + 0)/2 /100 = -1.0
