@@ -21,5 +21,6 @@ else if (mode === 'mrSlope') out = s.mrSlope(arg.rows, arg.char);
 else if (mode === 'matchupGaps') out = s.matchupGaps(arg.rows, arg.char);
 else if (mode === 'applyMrBridge') out = s.applyMrBridge(arg.p, arg.gap, arg.beta);
 else if (mode === 'sanitizePhaseStats') out = s.sanitizePhaseStats(arg.ps, arg.names);
+else if (mode === 'migratePhaseStats') out = s.migratePhaseStats(arg.ps);
 else throw new Error('unknown mode ' + mode);
 console.log(JSON.stringify(out));

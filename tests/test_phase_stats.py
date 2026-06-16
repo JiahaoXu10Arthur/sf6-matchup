@@ -267,3 +267,31 @@ def test_parse_slice_rejects_infinity():
            'rivalWinRates': []}
     # all entries dropped (Infinity -> 0 -> zero-battle) -> nothing valid -> null slice (not stored)
     assert run('parsePhaseSlice', {'rawSlice': raw, 'names': NAMES2}) is None
+
+def test_migrate_v1_flat_to_slices():
+    flat = {'seasonId': 12, 'perChar': {'TERRY': [1, 2]}, 'perMatchup': {'TERRY': {'KEN': [1, 2]}}}
+    m = run('migratePhaseStats', {'ps': flat})
+    assert m['defaultSlice'] == 'all:12'
+    assert m['slices']['all:12']['mode'] == 'all' and m['slices']['all:12']['phase'] == 12
+    assert m['slices']['all:12']['perChar'] == {'TERRY': [1, 2]}
+
+def test_migrate_already_v2_passthrough():
+    v2 = {'defaultSlice': 'ranked:12', 'slices': {'ranked:12': {'mode':'ranked','phase':12,'perChar':{},'perMatchup':{}}}}
+    assert run('migratePhaseStats', {'ps': v2}) == v2
+
+def test_routepull_accumulates_slices():
+    p1 = {'owner': '5', 'name': 'P', 'rows': [], 'phaseSlice': {'mode':'ranked','phase':12,'perChar':{'TERRY':[1,2]},'perMatchup':{}}}
+    r1 = run('routePull', {'roster': {}, 'payload': p1, 'now': 1})
+    assert r1['roster']['5']['phaseStats']['defaultSlice'] == 'ranked:12'
+    p2 = {'owner': '5', 'name': 'P', 'rows': [], 'phaseSlice': {'mode':'ranked','phase':11,'perChar':{'TERRY':[3,4]},'perMatchup':{}}}
+    r2 = run('routePull', {'roster': r1['roster'], 'payload': p2, 'now': 2})
+    keys = sorted(r2['roster']['5']['phaseStats']['slices'].keys())
+    assert keys == ['ranked:11', 'ranked:12']
+    assert r2['roster']['5']['phaseStats']['defaultSlice'] == 'ranked:11'
+
+def test_routepull_no_slice_preserves():
+    p1 = {'owner': '5', 'name': 'P', 'rows': [], 'phaseSlice': {'mode':'ranked','phase':12,'perChar':{'TERRY':[1,2]},'perMatchup':{}}}
+    r1 = run('routePull', {'roster': {}, 'payload': p1, 'now': 1})
+    p2 = {'owner': '5', 'name': 'P', 'rows': []}
+    r2 = run('routePull', {'roster': r1['roster'], 'payload': p2, 'now': 2})
+    assert list(r2['roster']['5']['phaseStats']['slices'].keys()) == ['ranked:12']

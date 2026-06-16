@@ -169,26 +169,41 @@ function safeId(id) {
   return (s === '__proto__' || s === 'constructor' || s === 'prototype') ? null : s;
 }
 
-// route a parsed pull ({owner,name,isSelf,rows[,phaseStats]}) into the roster: create a new
+// Convert a v1 flat phaseStats {seasonId, perChar, perMatchup} (Mode:All) to the v2 keyed
+// {defaultSlice, slices} form. Already-v2 objects (have .slices) pass through. Null -> null.
+function migratePhaseStats(ps) {
+  if (!ps || typeof ps !== 'object') return ps;
+  if (ps.slices) return ps;                                    // already v2
+  if (!('perChar' in ps) && !('perMatchup' in ps)) return ps;  // unknown shape, leave as-is
+  const phase = Number.isFinite(ps.seasonId) ? ps.seasonId : null;
+  const key = 'all:' + phase;
+  return { defaultSlice: key, slices: { [key]: { mode: 'all', phase, perChar: ps.perChar || {}, perMatchup: ps.perMatchup || {}, capturedAt: 0 } } };
+}
+
+// route a parsed pull ({owner,name,isSelf,rows[,phaseSlice]}) into the roster: create a new
 // profile or merge-dedupe into the existing one by CFN id. Returns {roster, activeId}
 // (immutable; activeId null if the owner is an unsafe key). A pull never clobbers a manual
 // rename — it only fills in the fighter name while the profile still has its default (id)
-// name; isSelf only ever flips on. phaseStats is a snapshot: present in payload -> replaces;
-// absent from payload -> prior snapshot preserved; no prior snapshot -> key absent.
+// name; isSelf only ever flips on. phaseSlice (if present) is accumulated into keyed slices
+// under phaseStats; absent from payload -> prior slices preserved; no prior -> key absent.
 function routePull(roster, payload, now) {
   const id = safeId(payload.owner);
   if (id == null) return { roster, activeId: null };
   const ex = roster[id];
-  const phase = ('phaseStats' in payload && payload.phaseStats != null)
-    ? payload.phaseStats
-    : (ex ? ex.phaseStats : undefined);
   const base = ex
     ? { ...ex, rows: mergeRows(ex.rows, payload.rows),
         name: (ex.name && ex.name !== ex.cfnId) ? ex.name : (payload.name || ex.name),
         isSelf: ex.isSelf || !!payload.isSelf,
         updatedAt: now }
     : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
-  const profile = phase !== undefined ? { ...base, phaseStats: phase } : base;
+  let phaseStats = ex ? migratePhaseStats(ex.phaseStats) : undefined;
+  const slice = payload.phaseSlice;
+  if (slice && slice.phase != null) {
+    const key = slice.mode + ':' + slice.phase;
+    const prior = phaseStats && phaseStats.slices ? phaseStats.slices : {};
+    phaseStats = { defaultSlice: key, slices: { ...prior, [key]: { ...slice, capturedAt: now } } };
+  }
+  const profile = phaseStats !== undefined ? { ...base, phaseStats } : base;
   return { roster: { ...roster, [id]: profile }, activeId: id };
 }
 
@@ -636,7 +651,7 @@ if (typeof module !== 'undefined') {
     personalRow, personalEncounter,
     skillMatchedAgg, diagnoseFromBaseline, prioritize,
     mrSlope, matchupGaps, applyMrBridge,
-    monthOf, newProfile, routePull, mergeRosters, safeId,
+    monthOf, newProfile, migratePhaseStats, routePull, mergeRosters, safeId,
     buildOfficialMap, officialName, parseBattlelog, parsePayload, parsePhaseSlice, _mapWinRates, sanitizePhaseStats,
     CSV_FIELDS, rowsToCsv, csvToRows, mergeRows, validRows,
   };
