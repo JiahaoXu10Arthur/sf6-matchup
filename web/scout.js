@@ -355,13 +355,24 @@ function applyMrBridge(p, gap, beta) {
 
 // Join the weighted personal record (agg) to the global baseline ({opp: 0..1}) and classify
 // each matchup. Splits the gap into personalGap (you below the field) and universalHardness
-// (the matchup is hard for everyone — already encoded in the baseline).
-function diagnoseFromBaseline(baseline, agg) {
+// (the matchup is hard for everyone — already encoded in the baseline). Optional opts:
+// opts.phase = {opp:[win,battle]}, opts.alpha, opts.gaps = {opp:gap}, opts.mrBeta.
+function diagnoseFromBaseline(baseline, agg, opts = {}) {
+  const phase = opts.phase || {};
+  const gaps = opts.gaps || {};
+  const alpha = opts.alpha ?? 0;
+  const beta = opts.mrBeta ?? 0;
   const out = [];
   for (const opp of Object.keys(baseline)) {
     const p0 = baseline[opp];
     const [w, l] = agg[opp] || [0, 0];
-    const c = classify(p0, w, l);
+    let phaseOpt;
+    const pp = phase[opp];
+    if (pp && pp[1] > 0 && alpha > 0) {
+      const rate = applyMrBridge(pp[0] / pp[1], gaps[opp] ?? 0, beta);
+      phaseOpt = { p: rate, n: pp[1], alpha };
+    }
+    const c = classify(p0, w, l, phaseOpt ? { phase: phaseOpt } : {});
     out.push({
       opp, baseline: p0, shrunk: c.shrunk, lo: c.lo, hi: c.hi,
       probBelow: c.probBelow, n: c.n, deficit: c.deficit, verdict: c.verdict,

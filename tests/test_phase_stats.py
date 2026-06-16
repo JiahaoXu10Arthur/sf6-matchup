@@ -132,3 +132,21 @@ def test_mr_slope_separable_data_stays_bounded():
     res = run('mrSlope', {'rows': rows, 'char': 'TERRY'})
     assert res['fallback'] is False        # 17 games >= MR_MIN_SAMPLE, so it fits
     assert abs(res['beta']) <= 3.0          # clamped to MR_MAX_BETA, not divergent
+
+def test_diagnose_no_opts_unchanged():
+    a = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [2, 4]}})
+    b = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [2, 4]}, 'opts': {'alpha': 0}})
+    assert a == b
+
+def test_diagnose_phase_sharpens_shrunk():
+    no    = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [3, 0]}})
+    withp = run('diagnoseFromBaseline', {'baseline': {'KEN': 0.50}, 'agg': {'KEN': [3, 0]},
+                'opts': {'alpha': 0.7, 'phase': {'KEN': [40, 200]}}})   # 20% phase rate, big n
+    assert withp[0]['shrunk'] < no[0]['shrunk']
+
+def test_diagnose_phase_absent_opponent_is_plain_classify():
+    # opponent present in baseline but NOT in phase -> no phase term, same as plain
+    plain = run('diagnoseFromBaseline', {'baseline': {'RYU': 0.50}, 'agg': {'RYU': [1, 1]}})
+    withp = run('diagnoseFromBaseline', {'baseline': {'RYU': 0.50}, 'agg': {'RYU': [1, 1]},
+                'opts': {'alpha': 0.7, 'phase': {'KEN': [40, 200]}}})   # phase has KEN, not RYU
+    assert plain[0]['shrunk'] == withp[0]['shrunk']

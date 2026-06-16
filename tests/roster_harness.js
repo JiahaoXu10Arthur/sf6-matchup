@@ -12,7 +12,7 @@ else if (mode === 'aggregate') out = s.aggregate(arg.rows, arg.char, arg.monthW)
 else if (mode === 'parsePayload') out = s.parsePayload(arg.payload, arg.names);
 else if (mode === 'safeId') out = s.safeId(arg.id);
 else if (mode === 'skillMatchedAgg') out = s.skillMatchedAgg(arg.rows, arg.char, arg.opts);
-else if (mode === 'diagnoseFromBaseline') out = s.diagnoseFromBaseline(arg.baseline, arg.agg);
+else if (mode === 'diagnoseFromBaseline') out = s.diagnoseFromBaseline(arg.baseline, arg.agg, arg.opts);
 else if (mode === 'prioritize') out = s.prioritize(arg.diagnoses, arg.usage);
 else if (mode === 'classify') out = s.classify(arg.p0, arg.wins, arg.losses, arg.opts || {});
 else if (mode === 'parsePhaseStats') out = s.parsePhaseStats(arg.phaseRaw, arg.names);
