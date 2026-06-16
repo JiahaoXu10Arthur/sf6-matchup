@@ -13,6 +13,7 @@ const state = {
   subSort: 'cover',       // sub-finder ranking key: 'cover' | 'spec' | 'str'
   useUsage: true,         // weight opponents by play rate (down-weights rare chars)
   coachAlpha: 0.7,        // Buckler phase-stats blend weight: 0 = ignore, 1 = full
+  coachSlice: null,       // active phaseStats slice key; null -> profile defaultSlice
   roster: {},             // {cfnId: profile} — persisted player histories
   activeProfileId: null,  // which profile the scout/views read
   personalMode: false,    // read views through the active profile (shrunk vs baseline)
@@ -100,6 +101,7 @@ async function init() {
   buildOppWeights();
   wireControls();
   try { state.roster = await loadRoster(); } catch (e) { state.roster = {}; }
+  for (const p of Object.values(state.roster)) { if (p.phaseStats) p.phaseStats = migratePhaseStats(p.phaseStats); }
   const ids = rosterList();
   if (ids.length) { state.activeProfileId = ids[0].cfnId; $('#personal-toggle').disabled = false; }
   render();
@@ -755,21 +757,22 @@ function renderCoach() {
   const agg = skillMatchedAgg(rows, char);
   const baseline = baselineWinrates(idx, char, state.monthW, exclude(), state.tierW);
   const freq = personalEncounter(rows, char);
-  const ps = activeProfile() && activeProfile().phaseStats;
-  const phase = (ps && ps.perMatchup && ps.perMatchup[char]) || null;
+  const psRaw = activeProfile() && activeProfile().phaseStats;
+  const ps = psRaw && psRaw.slices ? psRaw : null;
+  const sliceKey = ps ? (ps.slices[state.coachSlice] ? state.coachSlice : ps.defaultSlice) : null;
+  const slice = ps && sliceKey ? ps.slices[sliceKey] : null;
+  const phase = (slice && slice.perMatchup && slice.perMatchup[char]) || null;
   const opts = phase
     ? { phase, alpha: state.coachAlpha, mrBeta: mrSlope(rows, char).beta, gaps: matchupGaps(rows, char) }
     : {};
   const ranked = prioritize(diagnoseFromBaseline(baseline, agg, opts), freq).filter(d => d.score > 0);
   let phaseBlock = '';
   if (phase) {
-    const charRec = ps.perChar && ps.perChar[char];
+    const charRec = slice.perChar && slice.perChar[char];
     const charRateLine = charRec
       ? `<div class="coach-charrate">${t('coachCharRate', { char: escapeHtml(cn(char)), w: Math.round(charRec[0] / charRec[1] * 100), win: charRec[0], n: charRec[1] })}</div>`
       : '';
-    const seasonLine = ps.seasonId != null
-      ? `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: escapeHtml(String(ps.seasonId)) })}</div>`
-      : '';
+    const seasonLine = `<div class="coach-phase-badge">${t('coachPhaseBadge', { s: escapeHtml(String(slice.phase)), m: escapeHtml(String(slice.mode)) })}</div>`;
     const alphaVal = state.coachAlpha.toFixed(2);
     const offHint = state.coachAlpha === 0 ? ` <span class="coach-blend-off">${t('coachBlendOff')}</span>` : '';
     phaseBlock = `<div class="coach-blend">${charRateLine}${seasonLine}<label class="coach-blend-label">${t('coachBlend')} <span class="coach-blend-val">${alphaVal}</span>${offHint}<input id="coach-alpha-range" class="coach-blend-range" type="range" min="0" max="1" step="0.05" value="${alphaVal}" aria-label="${t('coachBlend')}"></label></div>`;
