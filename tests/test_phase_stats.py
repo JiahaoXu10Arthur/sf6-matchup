@@ -120,3 +120,15 @@ def test_matchup_gaps_mean_per_opponent():
     ]
     g = run('matchupGaps', {'rows': rows, 'char': 'TERRY'})
     assert abs(g['KEN'] - (-1.0)) < 1e-9      # mean gap (-200 + 0)/2 /100 = -1.0
+
+def test_mr_slope_separable_data_stays_bounded():
+    # Perfectly separable: wins only when you outrank, losses only when you underrank.
+    # Logistic MLE diverges here; the fitted beta must be clamped, not blow up.
+    rows = (
+        [{'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '1700', 'opp_mr': '1500', 'result': 'W'}] * 8 +
+        [{'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '1500', 'opp_mr': '1700', 'result': 'L'}] * 8 +
+        [{'your_char': 'TERRY', 'opp_char': 'KEN', 'rank_mr': '1600', 'opp_mr': '1600', 'result': 'W'}]
+    )
+    res = run('mrSlope', {'rows': rows, 'char': 'TERRY'})
+    assert res['fallback'] is False        # 17 games >= MR_MIN_SAMPLE, so it fits
+    assert abs(res['beta']) <= 3.0          # clamped to MR_MAX_BETA, not divergent

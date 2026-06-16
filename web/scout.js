@@ -293,6 +293,7 @@ function skillMatchedAgg(rows, char, opts = {}) {
 const MR_GAP_UNIT = 100;       // MR per logistic unit
 const MR_MIN_SAMPLE = 15;      // below this many MR-bearing games, use the fallback slope
 const MR_FALLBACK_BETA = 0.4;  // conservative default win-prob slope per 100-MR gap
+const MR_MAX_BETA = 3.0;       // clamp the fitted slope; beyond ±3 (≈sigmoid 0.95/100-MR) a separable fit overcorrects
 
 const _clampP = p => Math.min(1 - 1e-6, Math.max(1e-6, p));
 const _logit = p => { const q = _clampP(p); return Math.log(q / (1 - q)); };
@@ -327,7 +328,7 @@ function mrSlope(rows, char) {
     b0 -= (h11 * g0 - h01 * g1) / det;
     b1 -= (-h01 * g0 + h00 * g1) / det;
   }
-  return { beta: b1, fallback: false, n: pts.length };
+  return { beta: Math.max(-MR_MAX_BETA, Math.min(MR_MAX_BETA, b1)), fallback: false, n: pts.length };
 }
 
 // {opp: mean (yourMR - oppMR)/100} over MR-bearing games as `char`.
