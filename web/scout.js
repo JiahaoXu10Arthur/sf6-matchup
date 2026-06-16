@@ -188,7 +188,7 @@ function routePull(roster, payload, now) {
         isSelf: ex.isSelf || !!payload.isSelf,
         updatedAt: now }
     : newProfile(id, payload.name, payload.isSelf, payload.rows, now);
-  const profile = phase ? { ...base, phaseStats: phase } : base;
+  const profile = phase !== undefined ? { ...base, phaseStats: phase } : base;
   return { roster: { ...roster, [id]: profile }, activeId: id };
 }
 
