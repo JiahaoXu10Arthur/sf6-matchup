@@ -882,9 +882,9 @@ pill.remove();
 if(!replays.length){alert(${JSON.stringify(s.noMatches)});return;}
 pill.style.display='';pill.textContent=${JSON.stringify(s.bmStatsProgress)};document.body.appendChild(pill);
 var cwr=null,rwr=null;try{
-var rc=await fetch('/6/buckler/api/profile/play/act/characterwinrate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+var rc=await fetch('/6/buckler/api/profile/play/act/characterwinrate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:Number(owner),targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
 cwr=rc.response.character_win_rates;pill.textContent=${JSON.stringify(s.bmStatsChar)};
-var rr=await fetch('/6/buckler/api/profile/play/act/characterwinratebyrivalcharacter',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:owner,targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
+var rr=await fetch('/6/buckler/api/profile/play/act/characterwinratebyrivalcharacter',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetShortId:Number(owner),targetSeasonId:pickedPhase,targetModeId:2,lang:'en'})}).then(function(r){return r.json();});
 rwr=rr.response.character_win_rates_by_rival_character;pill.textContent=${JSON.stringify(s.bmStatsRival)};
 }catch(e){cwr=null;rwr=null;}
 pill.remove();
